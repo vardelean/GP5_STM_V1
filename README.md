@@ -1,6 +1,14 @@
-# STM32 USB HOST MIDI Controller
+# GP-5 STM32 MIDI Controller
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-STM32G0B1RE-blue.svg)](https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1re.html)
+[![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](QUICK_START.md)
 
 A production-ready USB HOST MIDI controller for controlling the Valeton GP-5 guitar effects pedal via STM32G0B1RE microcontroller.
+
+> **Repository**: [github.com/vardelean/GP-5_STM32_Eval](https://github.com/vardelean/GP-5_STM32_Eval) (Private)
+
+---
 
 ## Project Status
 
