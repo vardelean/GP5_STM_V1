@@ -1,0 +1,58 @@
+# Build directories and compiled files
+build/
+Debug/
+Release/
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.d
+*.lst
+
+# STM32CubeMX generated files (exclude .ioc)
+*.ioc
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Object files
+*.obj
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Log files
+*.log
+
+# Python cache (if any)
+__pycache__/
+*.pyc
+
+# Ninja build files
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
