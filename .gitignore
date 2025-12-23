@@ -13,6 +13,11 @@ Release/
 # STM32CubeMX generated files (exclude .ioc)
 *.ioc
 
+# Development notes (not for version control)
+HARDWARE_PORT_GUIDE.md
+PIN_MAPPING.md
+*_NOTES.md
+
 # IDE files
 .vscode/
 .idea/

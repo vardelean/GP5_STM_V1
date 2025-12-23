@@ -36,6 +36,10 @@ static uint8_t currentPresetNumber = 0;
 static bool presetNumberValid = false;
 static uint8_t activeSceneNumber = 1;  /* Default to Scene 1 */
 
+/* Current patch state tracking - what's currently ON/OFF on the GP-5 */
+static PatchInfo_t currentPatchState;
+static bool currentStateValid = false;
+
 /* Scene recall cooldown */
 static uint32_t lastSceneRecallCompleteTime = 0;
 #define SCENE_RECALL_COOLDOWN_MS 300  /* Ignore scene buttons for 300ms after recall */
@@ -43,6 +47,9 @@ static uint32_t lastSceneRecallCompleteTime = 0;
 /* Scene save state */
 static bool awaitingSaveConfirmation = false;
 static uint8_t pendingSceneSave = 0;  /* 0 = none, 1-3 = scene number to save */
+
+/* Scene 1 state learning */
+static bool awaitingScene1State = false;  /* Waiting for patch info after Scene 1 recall */
 
 /* External variables --------------------------------------------------------*/
 extern uint8_t midi_device_connected;
@@ -95,6 +102,10 @@ void GP5_MIDI_Init(void)
   /* Request initial preset number (will be sent when GP-5 connects) */
   presetNumberValid = false;
   activeSceneNumber = 1;
+  currentStateValid = false;
+  
+  /* Initialize current patch state to all OFF */
+  memset(&currentPatchState, 0, sizeof(currentPatchState));
 }
 
 /**
@@ -143,12 +154,16 @@ void GP5_MIDI_HandleButtonEvent(ButtonID_t button, ButtonEvent_t event)
     /* Handle Scene 1 button - recall preset defaults via CC#0 */
     if (button == BTN_SCENE1)
     {
-      #if DEBUG_VERBOSE
-      printf("[Scene] Recalling Scene 1 (preset defaults) for preset %d...\r\n", currentPresetNumber);
-      #endif
+      printf("[Scene1] Recalling preset defaults for preset %d\r\n", currentPresetNumber);
+      printf("[Scene1] -> Sending CC#0, Value=%d (preset number)\r\n", currentPresetNumber);
       
       /* Send CC#0 with current preset number to reload defaults */
       MIDI_Manager_SendCC(GP5_MIDI_CHANNEL, 0, currentPresetNumber);
+      
+      /* Request patch info to learn Scene 1 default state */
+      printf("[Scene1] Requesting patch info to learn default state...\r\n");
+      awaitingScene1State = true;
+      GP5_MIDI_RequestPatchInfo();
       
       /* Update LED */
       LED_SetScene(LED_SCENE1);
@@ -181,33 +196,166 @@ void GP5_MIDI_HandleButtonEvent(ButtonID_t button, ButtonEvent_t event)
         }
       }
       
-      #if DEBUG_VERBOSE
-      printf("[Scene] Recalling Scene %d...\r\n", sceneNum);
-      #endif
+      printf("[Scene%d] Recalling saved scene for preset %d\r\n", sceneNum, currentPresetNumber);
       
       /* Get saved scene patches */
       PatchInfo_t savedPatches;
       SceneManager_GetScenePatches(currentPresetNumber, sceneNum, &savedPatches);
       
-      /* Send ALL CC commands immediately (GP-5 queues them) - NO DELAYS! */
-      GP5_MIDI_SetPatchState(GP5_CC_NR, savedPatches.patchNR);
-      GP5_MIDI_SetPatchState(GP5_CC_PRE, savedPatches.patchPRE);
-      GP5_MIDI_SetPatchState(GP5_CC_DST, savedPatches.patchDST);
-      GP5_MIDI_SetPatchState(GP5_CC_NS, savedPatches.patchNS);
-      GP5_MIDI_SetPatchState(GP5_CC_AMP, savedPatches.patchAMP);
-      GP5_MIDI_SetPatchState(GP5_CC_CAB, savedPatches.patchCAB);
-      GP5_MIDI_SetPatchState(GP5_CC_EQ, savedPatches.patchEQ);
-      GP5_MIDI_SetPatchState(GP5_CC_MOD, savedPatches.patchMOD);
-      GP5_MIDI_SetPatchState(GP5_CC_DLY, savedPatches.patchDLY);
-      GP5_MIDI_SetPatchState(GP5_CC_RVB, savedPatches.patchRVB);
+      /* Print what we're about to send */
+      printf("[Scene%d] Target state:\r\n", sceneNum);
+      printf("  NR=%s PRE=%s DST=%s NS=%s AMP=%s CAB=%s EQ=%s MOD=%s DLY=%s RVB=%s\r\n",
+             savedPatches.patchNR ? "ON" : "OFF", savedPatches.patchPRE ? "ON" : "OFF",
+             savedPatches.patchDST ? "ON" : "OFF", savedPatches.patchNS ? "ON" : "OFF",
+             savedPatches.patchAMP ? "ON" : "OFF", savedPatches.patchCAB ? "ON" : "OFF",
+             savedPatches.patchEQ ? "ON" : "OFF", savedPatches.patchMOD ? "ON" : "OFF",
+             savedPatches.patchDLY ? "ON" : "OFF", savedPatches.patchRVB ? "ON" : "OFF");
       
-      /* Force app refresh with CTL screen flicker */
-      MIDI_Manager_SendCC(GP5_MIDI_CHANNEL, GP5_CC_CTL_SCREEN, 127);  /* Enter CTL */
-      MIDI_Manager_SendCC(GP5_MIDI_CHANNEL, GP5_CC_CTL_SCREEN, 0);    /* Exit CTL */
+      /* Compare with current state and only send changed patches */
+      uint8_t changeCount = 0;
       
-      #if DEBUG_VERBOSE
-      printf("[Scene] Scene %d recalled successfully\r\n", sceneNum);
-      #endif      
+      if (!currentStateValid)
+      {
+        /* Don't know current state - send all CC commands */
+        printf("[Scene%d] Current state unknown - sending ALL patches\r\n", sceneNum);
+        
+        printf("[Scene%d] Sending CC#48 (NR)  = %d\r\n", sceneNum, savedPatches.patchNR ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_NR, savedPatches.patchNR);
+        
+        printf("[Scene%d] Sending CC#49 (PRE) = %d\r\n", sceneNum, savedPatches.patchPRE ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_PRE, savedPatches.patchPRE);
+        
+        printf("[Scene%d] Sending CC#50 (DST) = %d\r\n", sceneNum, savedPatches.patchDST ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_DST, savedPatches.patchDST);
+        
+        printf("[Scene%d] Sending CC#51 (NS)  = %d\r\n", sceneNum, savedPatches.patchNS ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_NS, savedPatches.patchNS);
+        
+        printf("[Scene%d] Sending CC#52 (AMP) = %d\r\n", sceneNum, savedPatches.patchAMP ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_AMP, savedPatches.patchAMP);
+        
+        printf("[Scene%d] Sending CC#53 (CAB) = %d\r\n", sceneNum, savedPatches.patchCAB ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_CAB, savedPatches.patchCAB);
+        
+        printf("[Scene%d] Sending CC#54 (EQ)  = %d\r\n", sceneNum, savedPatches.patchEQ ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_EQ, savedPatches.patchEQ);
+        
+        printf("[Scene%d] Sending CC#55 (MOD) = %d\r\n", sceneNum, savedPatches.patchMOD ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_MOD, savedPatches.patchMOD);
+        
+        printf("[Scene%d] Sending CC#56 (DLY) = %d\r\n", sceneNum, savedPatches.patchDLY ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_DLY, savedPatches.patchDLY);
+        
+        printf("[Scene%d] Sending CC#57 (RVB) = %d\r\n", sceneNum, savedPatches.patchRVB ? 127 : 0);
+        GP5_MIDI_SetPatchState(GP5_CC_RVB, savedPatches.patchRVB);
+        
+        changeCount = 10;
+      }
+      else
+      {
+        /* We know current state - send only changes */
+        printf("[Scene%d] Differential update - sending only changes:\r\n", sceneNum);
+        
+        if (currentPatchState.patchNR != savedPatches.patchNR) {
+          printf("  CC#48 (NR):  %s -> %s\r\n", 
+                 currentPatchState.patchNR ? "ON" : "OFF",
+                 savedPatches.patchNR ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_NR, savedPatches.patchNR);
+          changeCount++;
+        }
+        
+        if (currentPatchState.patchPRE != savedPatches.patchPRE) {
+          printf("  CC#49 (PRE): %s -> %s\r\n",
+                 currentPatchState.patchPRE ? "ON" : "OFF",
+                 savedPatches.patchPRE ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_PRE, savedPatches.patchPRE);
+          changeCount++;
+        }
+        
+        if (currentPatchState.patchDST != savedPatches.patchDST) {
+          printf("  CC#50 (DST): %s -> %s\r\n",
+                 currentPatchState.patchDST ? "ON" : "OFF",
+                 savedPatches.patchDST ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_DST, savedPatches.patchDST);
+          changeCount++;
+        }
+        
+        if (currentPatchState.patchNS != savedPatches.patchNS) {
+          printf("  CC#51 (NS):  %s -> %s\r\n",
+                 currentPatchState.patchNS ? "ON" : "OFF",
+                 savedPatches.patchNS ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_NS, savedPatches.patchNS);
+          changeCount++;
+        }
+        
+        if (currentPatchState.patchAMP != savedPatches.patchAMP) {
+          printf("  CC#52 (AMP): %s -> %s\r\n",
+                 currentPatchState.patchAMP ? "ON" : "OFF",
+                 savedPatches.patchAMP ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_AMP, savedPatches.patchAMP);
+          changeCount++;
+        }
+        
+        if (currentPatchState.patchCAB != savedPatches.patchCAB) {
+          printf("  CC#53 (CAB): %s -> %s\r\n",
+                 currentPatchState.patchCAB ? "ON" : "OFF",
+                 savedPatches.patchCAB ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_CAB, savedPatches.patchCAB);
+          changeCount++;
+        }
+        
+        if (currentPatchState.patchEQ != savedPatches.patchEQ) {
+          printf("  CC#54 (EQ):  %s -> %s\r\n",
+                 currentPatchState.patchEQ ? "ON" : "OFF",
+                 savedPatches.patchEQ ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_EQ, savedPatches.patchEQ);
+          changeCount++;
+        }
+        
+        if (currentPatchState.patchMOD != savedPatches.patchMOD) {
+          printf("  CC#55 (MOD): %s -> %s\r\n",
+                 currentPatchState.patchMOD ? "ON" : "OFF",
+                 savedPatches.patchMOD ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_MOD, savedPatches.patchMOD);
+          changeCount++;
+        }
+        
+        if (currentPatchState.patchDLY != savedPatches.patchDLY) {
+          printf("  CC#56 (DLY): %s -> %s\r\n",
+                 currentPatchState.patchDLY ? "ON" : "OFF",
+                 savedPatches.patchDLY ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_DLY, savedPatches.patchDLY);
+          changeCount++;
+        }
+        
+        if (currentPatchState.patchRVB != savedPatches.patchRVB) {
+          printf("  CC#57 (RVB): %s -> %s\r\n",
+                 currentPatchState.patchRVB ? "ON" : "OFF",
+                 savedPatches.patchRVB ? "ON" : "OFF");
+          GP5_MIDI_SetPatchState(GP5_CC_RVB, savedPatches.patchRVB);
+          changeCount++;
+        }
+        
+        if (changeCount == 0) {
+          printf("[Scene%d] No changes needed - already in target state!\r\n", sceneNum);
+        }
+      }
+      
+      /* Force app refresh with CTL screen flicker only if we sent commands */
+      if (changeCount > 0) {
+        /* Wait for GP-5 to process CC commands before triggering screen refresh */
+       // HAL_Delay(100);
+        
+        printf("[Scene%d] App refresh: CC#80=127, CC#80=0\r\n", sceneNum);
+        MIDI_Manager_SendCC(GP5_MIDI_CHANNEL, GP5_CC_CTL_SCREEN, 127);  /* Enter CTL */
+        MIDI_Manager_SendCC(GP5_MIDI_CHANNEL, GP5_CC_CTL_SCREEN, 0);    /* Exit CTL */
+      }
+      
+      printf("[Scene%d] Complete! (%d CC commands sent)\r\n", sceneNum, changeCount);
+      
+      /* Update current state to match saved scene */
+      currentPatchState = savedPatches;
+      currentStateValid = true;      
       /* Update scene LED */
       if (sceneNum == 2) {
         LED_SetScene(LED_SCENE2);
@@ -398,12 +546,15 @@ void GP5_MIDI_ProcessReceivedData(uint8_t *data, uint16_t length)
       /* Check for preset change ACK */
       if (GP5_MIDI_IsPresetChangeACK(clean_midi, clean_length))
       {
-        #if DEBUG_VERBOSE
-        printf("[GP-5] Preset change ACK\r\n");
-        #endif
+        printf("[GP-5] Preset change detected\r\n");
         
         /* Automatically request preset number */
         GP5_MIDI_RequestPresetNumber();
+        
+        /* Also request patch info to learn new Scene 1 default state */
+        printf("[GP-5] Requesting patch info for new preset defaults...\r\n");
+        awaitingScene1State = true;
+        GP5_MIDI_RequestPatchInfo();
       }
       /* Check for preset number response */
       else if (clean_length == 18 && clean_midi[3] == 0x00 && clean_midi[4] == 0x01)
@@ -416,6 +567,9 @@ void GP5_MIDI_ProcessReceivedData(uint8_t *data, uint16_t length)
           /* Update current preset */
           currentPresetNumber = preset;
           presetNumberValid = true;
+          
+          /* Preset changed - invalidate current state (don't know Scene 1 defaults) */
+          currentStateValid = false;
           
           /* Scene 1 is always "available" (represents preset defaults) */
           /* Turn ON ledScene1 after any preset change */
@@ -433,12 +587,27 @@ void GP5_MIDI_ProcessReceivedData(uint8_t *data, uint16_t length)
           printf("[GP-5] Patch info: 0x%08lX\r\n", patchBitmap);
           #endif
           
+          /* Check if we're waiting to learn Scene 1 default state */
+          if (awaitingScene1State)
+          {
+            /* Store Scene 1 default state */
+            SceneManager_DecodePatchBitmap(patchBitmap, &currentPatchState);
+            currentStateValid = true;
+            printf("[Scene1] Default state learned - differential updates enabled\r\n");
+            
+            /* Clear flag */
+            awaitingScene1State = false;
+          }
           /* Check if we're waiting to save a scene */
-          if (awaitingSaveConfirmation && pendingSceneSave > 0)
+          else if (awaitingSaveConfirmation && pendingSceneSave > 0)
           {
             /* Save the scene */
             SceneManager_SaveScene(currentPresetNumber, pendingSceneSave, patchBitmap);
             printf("[Scene] Scene %d saved\r\n", pendingSceneSave);
+            
+            /* Update current state - we now know exactly what's active */
+            SceneManager_GetScenePatches(currentPresetNumber, pendingSceneSave, &currentPatchState);
+            currentStateValid = true;
             
             /* Turn on the scene LED to confirm (only Scene 2 or 3) */
             if (pendingSceneSave == 2) {
