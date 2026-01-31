@@ -16,9 +16,25 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include <stdint.h>
 #include <stdbool.h>
-#include "button_handler.h"
 
 /* Exported types ------------------------------------------------------------*/
+
+/**
+  * @brief  GP-5 Patch Information Structure
+  */
+typedef struct
+{
+  uint8_t patchNR;   /* Noise Reduction */
+  uint8_t patchPRE;  /* Preamp */
+  uint8_t patchDST;  /* Distortion */
+  uint8_t patchNS;   /* Neural Amp */
+  uint8_t patchAMP;  /* Amplifier */
+  uint8_t patchCAB;  /* Cabinet */
+  uint8_t patchEQ;   /* Equalizer */
+  uint8_t patchMOD;  /* Modulation */
+  uint8_t patchDLY;  /* Delay */
+  uint8_t patchRVB;  /* Reverb */
+} PatchInfo_t;
 
 /* Exported constants --------------------------------------------------------*/
 
@@ -50,7 +66,7 @@ extern "C" {
 /* Exported functions prototypes ---------------------------------------------*/
 
 /**
-  * @brief  Initialize GP-5 MIDI messages for all buttons
+  * @brief  Initialize GP-5 MIDI communication
   * @retval None
   */
 void GP5_MIDI_Init(void);
@@ -60,22 +76,6 @@ void GP5_MIDI_Init(void);
   * @retval None
   */
 void GP5_MIDI_RequestInitialPreset(void);
-
-/**
-  * @brief  Test function: Save a test scene (for development)
-  * @param  preset: Preset number
-  * @param  sceneNum: Scene number (1-3)
-  * @retval None
-  */
-void GP5_MIDI_SaveTestScene(uint8_t preset, uint8_t sceneNum);
-
-/**
-  * @brief  Handle button events and send appropriate GP-5 MIDI messages
-  * @param  button: Button ID
-  * @param  event: Button event type
-  * @retval None
-  */
-void GP5_MIDI_HandleButtonEvent(ButtonID_t button, ButtonEvent_t event);
 
 /**
   * @brief  Process received MIDI messages from GP-5
@@ -130,6 +130,12 @@ bool GP5_MIDI_ParsePatchInfo(uint8_t *data, uint16_t len, uint32_t *patchBitmap)
   * @retval None
   */
 void GP5_MIDI_SetPatchState(uint8_t patchCC, bool turnOn);
+
+/**
+  * @brief  Notify that we are sending a preset change command
+  * @retval None
+  */
+void GP5_MIDI_NotifyPresetChangeSent(void);
 
 #ifdef __cplusplus
 }

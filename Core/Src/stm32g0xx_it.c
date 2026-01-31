@@ -18,7 +18,7 @@
 #include "main.h"
 #include "stm32g0xx_it.h"
 /* Private includes ----------------------------------------------------------*/
-#include "button_handler.h"
+#include "preset_buttons.h"
 #include <stdio.h>
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -28,6 +28,7 @@
 /* Private user code ---------------------------------------------------------*/
 /* External variables --------------------------------------------------------*/
 extern HCD_HandleTypeDef hhcd_USB_DRD_FS;
+extern I2C_HandleTypeDef hi2c2;
 /******************************************************************************/
 /*           Cortex-M0+ Processor Interruption and Exception Handlers          */
 /******************************************************************************/
@@ -70,7 +71,6 @@ void PendSV_Handler(void)
   */
 void SysTick_Handler(void)
 {
-  ButtonHandler_TimerUpdate();
   HAL_IncTick();
 }
 
@@ -88,18 +88,23 @@ void USB_UCPD1_2_IRQHandler(void)
 {
   HAL_HCD_IRQHandler(&hhcd_USB_DRD_FS);
 }
+
 /**
   * @brief This function handles EXTI line 0 and 1 interrupts.
   */
 void EXTI0_1_IRQHandler(void)
 {
-  uint32_t pr = EXTI->RPR1 | EXTI->FPR1;
-
+  /* Check btnPst0 (PB0) and btnPst1 (PB1) */
+  if (__HAL_GPIO_EXTI_GET_IT(btnPst0_Pin) != 0)
+  {
+    __HAL_GPIO_EXTI_CLEAR_IT(btnPst0_Pin);
+    PresetButtons_GPIO_EXTI_Callback(btnPst0_Pin);
+  }
   
-  /* Manually check and clear pending bits, then call button handler */
-  if (pr & btnScene1_Pin) {
-    __HAL_GPIO_EXTI_CLEAR_IT(btnScene1_Pin);
-    ButtonHandler_GPIO_EXTI_Callback(btnScene1_Pin);
+  if (__HAL_GPIO_EXTI_GET_IT(btnPst1_Pin) != 0)
+  {
+    __HAL_GPIO_EXTI_CLEAR_IT(btnPst1_Pin);
+    PresetButtons_GPIO_EXTI_Callback(btnPst1_Pin);
   }
 }
 
@@ -108,17 +113,17 @@ void EXTI0_1_IRQHandler(void)
   */
 void EXTI2_3_IRQHandler(void)
 {
-  uint32_t pr = EXTI->RPR1 | EXTI->FPR1;
-
-  
-  /* Manually check and clear pending bits, then call button handler */
-  if (pr & btnScene2_Pin) {
-    __HAL_GPIO_EXTI_CLEAR_IT(btnScene2_Pin);
-    ButtonHandler_GPIO_EXTI_Callback(btnScene2_Pin);
+  /* Check btnPst2 (PB2) and btnPst3 (PB3) */
+  if (__HAL_GPIO_EXTI_GET_IT(btnPst2_Pin) != 0)
+  {
+    __HAL_GPIO_EXTI_CLEAR_IT(btnPst2_Pin);
+    PresetButtons_GPIO_EXTI_Callback(btnPst2_Pin);
   }
-  if (pr & btnScene3_Pin) {
-    __HAL_GPIO_EXTI_CLEAR_IT(btnScene3_Pin);
-    ButtonHandler_GPIO_EXTI_Callback(btnScene3_Pin);
+  
+  if (__HAL_GPIO_EXTI_GET_IT(btnPst3_Pin) != 0)
+  {
+    __HAL_GPIO_EXTI_CLEAR_IT(btnPst3_Pin);
+    PresetButtons_GPIO_EXTI_Callback(btnPst3_Pin);
   }
 }
 
@@ -127,28 +132,55 @@ void EXTI2_3_IRQHandler(void)
   */
 void EXTI4_15_IRQHandler(void)
 {
-  uint32_t pr = EXTI->RPR1 | EXTI->FPR1;
+  /* Check btnPst4 (PB4) */
+  if (__HAL_GPIO_EXTI_GET_IT(btnPst4_Pin) != 0)
+  {
+    __HAL_GPIO_EXTI_CLEAR_IT(btnPst4_Pin);
+    PresetButtons_GPIO_EXTI_Callback(btnPst4_Pin);
+  }
   
-  /* Manually check and clear pending bits, then call button handler */
-  if (pr & btnUp_Pin) {
-    __HAL_GPIO_EXTI_CLEAR_IT(btnUp_Pin);
-    ButtonHandler_GPIO_EXTI_Callback(btnUp_Pin);
+  /* Check btnBankUp (PB5) */
+  if (__HAL_GPIO_EXTI_GET_IT(btnBankUp_Pin) != 0)
+  {
+    __HAL_GPIO_EXTI_CLEAR_IT(btnBankUp_Pin);
+    PresetButtons_GPIO_EXTI_Callback(btnBankUp_Pin);
   }
-  if (pr & btnDown_Pin) {
-    __HAL_GPIO_EXTI_CLEAR_IT(btnDown_Pin);
-    ButtonHandler_GPIO_EXTI_Callback(btnDown_Pin);
+  
+  /* Check btnBankDown (PB6) */
+  if (__HAL_GPIO_EXTI_GET_IT(btnBankDown_Pin) != 0)
+  {
+    __HAL_GPIO_EXTI_CLEAR_IT(btnBankDown_Pin);
+    PresetButtons_GPIO_EXTI_Callback(btnBankDown_Pin);
   }
-  if (pr & btnTap_Pin) {
-    __HAL_GPIO_EXTI_CLEAR_IT(btnTap_Pin);
-    ButtonHandler_GPIO_EXTI_Callback(btnTap_Pin);
+  
+  /* Check btnCtl (PB7) */
+  if (__HAL_GPIO_EXTI_GET_IT(btnCtl_Pin) != 0)
+  {
+    __HAL_GPIO_EXTI_CLEAR_IT(btnCtl_Pin);
+    PresetButtons_GPIO_EXTI_Callback(btnCtl_Pin);
+  }
+  
+  /* Check btnTapTempo (PB8) */
+  if (__HAL_GPIO_EXTI_GET_IT(btnTapTempo_Pin) != 0)
+  {
+    __HAL_GPIO_EXTI_CLEAR_IT(btnTapTempo_Pin);
+    PresetButtons_GPIO_EXTI_Callback(btnTapTempo_Pin);
   }
 }
 
+
 /**
-  * @brief GPIO EXTI callback
+  * @brief This function handles I2C2, I2C3 Interrupt (combined with EXTI 24 and EXTI 22).
   */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+void I2C2_3_IRQHandler(void)
 {
-  printf("[EXTI] HAL Callback triggered, pin=0x%04X\r\n", GPIO_Pin);
-  ButtonHandler_GPIO_EXTI_Callback(GPIO_Pin);
+ 
+  if (hi2c2.Instance->ISR & (I2C_FLAG_BERR | I2C_FLAG_ARLO | I2C_FLAG_OVR))
+  {
+    HAL_I2C_ER_IRQHandler(&hi2c2);
+  }
+  else
+  {
+    HAL_I2C_EV_IRQHandler(&hi2c2);
+  }
 }

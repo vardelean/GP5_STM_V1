@@ -10,6 +10,8 @@ set(MX_Defines_Syms
 
 # STM32CubeMX generated include paths
 set(MX_Include_Dirs
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Lib/SSD1306
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Lib
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Inc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Host/App
     ${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Host/Target
@@ -28,18 +30,19 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Host/Target/usbh_platform.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Host/App/usb_host.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/i2c.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/gpio.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/usart.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32g0xx_it.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32g0xx_hal_msp.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/sysmem.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/syscalls.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/button_handler.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/led_controller.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/display.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/midi_manager.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/flash_storage.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/gp5_midi.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/scene_manager.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/preset_buttons.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Lib/SSD1306/ssd1306.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Lib/SSD1306/ssd1306_fonts.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../startup_stm32g0b1xx.s
 )
 
@@ -62,6 +65,8 @@ set(STM32_Drivers_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal_exti.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal_uart.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal_i2c_ex.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal_i2c.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_hal_uart_ex.c
 )
 

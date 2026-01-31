@@ -33,6 +33,7 @@ void SVC_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
 void USB_UCPD1_2_IRQHandler(void);
+void I2C2_3_IRQHandler(void);
 #ifdef __cplusplus
 }
 #endif
