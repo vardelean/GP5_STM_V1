@@ -175,6 +175,10 @@ int main(void)
         printf("[GP-5] Requesting initial preset number...\r\n");
         GP5_MIDI_RequestInitialPreset();
         preset_request_pending = 0; /* Clear flag */
+        
+        /* Request startup preset recall after initial GP-5 connection */
+        printf("[Main] Requesting startup preset recall...\r\n");
+        PresetButtons_RequestStartupPresetRecall();
       }
     }
 

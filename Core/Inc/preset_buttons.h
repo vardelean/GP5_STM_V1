@@ -21,9 +21,11 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 
 /* Exported constants --------------------------------------------------------*/
-#define NUM_BANKS           20
-#define PRESETS_PER_BANK    5
-#define MAX_PRESET_NUMBER   99
+#define NUM_BANKS           16          /* 16 banks for STM32 controller */
+#define PRESETS_PER_BANK    5           /* 5 presets per bank */
+#define MAX_PRESET_NUMBER   99          /* Maximum GP-5 preset number */
+#define HOLD_TIME_SAVE_MS   2000        /* Hold 2 seconds to save */
+#define HOLD_TIME_CLEAR_MS  5000        /* Hold 5 seconds to clear */
 
 /* Exported macro ------------------------------------------------------------*/
 
@@ -49,8 +51,14 @@ void PresetButtons_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
 void PresetButtons_Process(void);
 
 /**
+  * @brief  Request startup preset recall (call after GP-5 connection)
+  * @retval None
+  */
+void PresetButtons_RequestStartupPresetRecall(void);
+
+/**
   * @brief  Get current bank number
-  * @retval Current bank (0-19)
+  * @retval Current bank (0-15)
   */
 uint8_t PresetButtons_GetCurrentBank(void);
 

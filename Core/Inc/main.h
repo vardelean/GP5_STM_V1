@@ -58,7 +58,7 @@ void Error_Handler(void);
 #define btnBankDown_Pin GPIO_PIN_6
 #define btnBankDown_GPIO_Port GPIOB
 #define btnCtl_Pin GPIO_PIN_7
-#define btnCtl_GPIO_Port GPIOB
+#define btnCtl_GPIO_Port GPIOB  
 #define btnTapTempo_Pin GPIO_PIN_8
 #define btnTapTempo_GPIO_Port GPIOB
 #ifdef __cplusplus

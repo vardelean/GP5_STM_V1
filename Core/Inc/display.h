@@ -15,6 +15,8 @@ extern "C" {
 #define bankNumSecondDigitPosY 27
 #define presetNumPosX 86
 #define presetNumPosY 28
+#define gp5SavedPresetPosX 108
+#define gp5SavedPresetPosPosY 4
 
 /* External variables */
 extern uint8_t bankAreaCoords[]; // x, y, width, height
@@ -24,11 +26,11 @@ extern SSD1306_COLOR bankNumColor;
 void Display_Init(void);
 void Display_BankNumber(uint8_t bankNum, SSD1306_COLOR color);
 void Display_PresetNumber(uint8_t presetNum);
+void Display_GP5SavedPreset(uint8_t gp5Preset);
 SSD1306_COLOR InvertBankBackground(SSD1306_COLOR currentColor, uint8_t bankNumber);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* DISPLAY
-_H */
+#endif /* DISPLAY_H */

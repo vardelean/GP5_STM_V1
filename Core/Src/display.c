@@ -22,9 +22,11 @@ void Display_Init(void)
   SSD1306_COLOR color = White; 
 
   SSD1306_WriteString("BANK", Font_7x10, color);
-  SSD1306_SetCursor(75,  4); 
-  SSD1306_WriteString("PRESET", Font_7x10, color);
- // SSD1306_DrawLine(0, 15, 127, 15, color); // Horizontal line below titles
+  SSD1306_SetCursor(68,  4); 
+  SSD1306_WriteString("GP5: ", Font_7x10, color);
+  SSD1306_SetCursor(gp5SavedPresetPosX,  gp5SavedPresetPosPosY); 
+  SSD1306_WriteString("--", Font_7x10, color); // GP-5 saved preset placeholder
+ 
   SSD1306_DrawRectangle(0, 0, 127, 15, color);  // Draw a border of one pixel around the title
  
   SSD1306_DrawFilledRectangle(63, 0, 0, 63, color);  // x=63, y=0, width=0 (one pixel), height=64; middle vertical line
@@ -54,6 +56,33 @@ void Display_PresetNumber(uint8_t presetNum)
     SSD1306_SetCursor(presetNumPosX, presetNumPosY);
     SSD1306_WriteChar(0x30 + buttonNum, Font_19x26, White); 
     SSD1306_UpdateScreen();  // Refresh display to show updated preset number
+}
+
+void Display_GP5SavedPreset(uint8_t gp5Preset)
+{
+    // Display saved GP-5 preset number (00-99 or "--")
+    SSD1306_SetCursor(gp5SavedPresetPosX, gp5SavedPresetPosPosY);
+    
+    if (gp5Preset == 0xFF)  // Empty/cleared preset
+    {
+        SSD1306_WriteString("--", Font_7x10, White);
+    }
+    else if (gp5Preset <= 99)  // Valid preset
+    {
+        uint8_t firstDigit = gp5Preset / 10;
+        uint8_t secondDigit = gp5Preset % 10;
+        char presetStr[3];
+        presetStr[0] = 0x30 + firstDigit;
+        presetStr[1] = 0x30 + secondDigit;
+        presetStr[2] = '\0';
+        SSD1306_WriteString(presetStr, Font_7x10, White);
+    }
+    else  // Invalid value
+    {
+        SSD1306_WriteString("??", Font_7x10, White);
+    }
+    
+    SSD1306_UpdateScreen();  // Refresh display
 }
 
 SSD1306_COLOR InvertBankBackground(SSD1306_COLOR currentColor, uint8_t bankNumber)

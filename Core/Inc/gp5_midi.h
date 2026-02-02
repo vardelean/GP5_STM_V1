@@ -54,6 +54,7 @@ typedef struct
 #define GP5_CC_MOD                  55  /* Modulation */
 #define GP5_CC_DLY                  56  /* Delay */
 #define GP5_CC_RVB                  57  /* Reverb */
+#define GP5_CC_TUNER                58  /* Tuner ON/OFF (64-127=ON, 0-63=OFF) */
 
 /* GP-5 Screen Control */
 #define GP5_CC_CTL_SCREEN           69  /* CTL screen toggle (0x45) - forces app refresh */
