@@ -3,21 +3,78 @@
 ## Hardware Setup
 
 ### Required Components
-- **NUCLEO-G0B1RE** evaluation board
+- **STM32G0B1KBU6** microcontroller (UFQFPN32 package) on custom PCB
 - **Valeton GP-5** guitar effects pedal  
-- USB cable to connect GP-5 to STM32
-- ST-Link USB cable for programming
+- USB-C cable to connect GP-5 to STM32 controller
+- ST-Link V3 MINI debugger for programming and serial monitor
+- **8MHz external oscillator** on PC14 (or use HSI48 internal oscillator)
+- **3.3V power supply** for STM32
 
 ### Required Software
 - CMake 3.22+
-- ARM GCC Toolchain (arm-none-eabi-gcc)
-- STM32CubeProgrammer
-- Serial terminal (optional for debug)
+- ARM GCC Toolchain (arm-none-eabi-gcc 14.3.1 or later)
+- STM32CubeProgrammer v2.21+
+- VS Code with CMake Tools extension
+- Serial terminal (115200 baud for debug output)
 
-### Connections
-1. Connect ST-Link cable to PC for programming
-2. Connect GP-5 to STM32 USB HOST port
-3. Power on the system
+### Hardware Connections
+
+#### Power
+1. Apply 3.3V to STM32 VDD pin
+2. Connect GND
+3. USB VBUS (5V) powered via P-channel MOSFET controlled by PB9
+
+#### USB Connection (GP-5 ↔ STM32)
+1. Connect GP-5 USB-C port to STM32 USB HOST
+   - GP-5 USB DP (B6 or A6) → STM32 PA12 (Pin 23)
+   - GP-5 USB DN (B7 or A7) → STM32 PA11 (Pin 22)
+   - **Note**: Type-C orientation matters if only one set of D+/D- is connected!
+
+#### Debug (ST-Link ↔ STM32)
+1. Connect SWDIO (ST-Link) → PA13 (STM32 Pin 26)
+2. Connect SWCLK (ST-Link) → PA14 (STM32 Pin 27)
+3. Connect GND
+4. UART2 (PA2/PA3) automatically available as ST-Link VCP
+
+#### Buttons (optional for initial test)
+- PC4, PC5, PB3, PB4, PB5: Preset buttons (pull-up resistors)
+- PC6: CTL button
+- PC7: Tap Tempo button
+
+---
+
+## First-Time Setup
+
+### Step 1: Clock Configuration
+
+**Option A: External 8MHz Oscillator (Recommended)**
+- Connect 8MHz oscillator to PC14 (Pin 2)
+- Code uses HSE_BYPASS mode
+- Provides stable 48MHz for USB via PLL
+
+**Option B: Internal HSI48 (No external crystal needed)**
+- Modify `SystemClock_Config()` in `main.c`
+- Change `RCC_OSCILLATORTYPE_HSE` to `RCC_OSCILLATORTYPE_HSI48`
+- Less accurate but works for USB
+
+### Step 2: Verify USB Fixes
+
+**CRITICAL**: Ensure these fixes are in your code (already present in repository):
+
+1. **File: `USB_Host/Target/usbh_conf.c`** - `USBH_LL_Init()`:
+   ```c
+   hhcd_USB_DRD_FS.Init.Sof_enable = ENABLE;  // Must be ENABLE!
+   ```
+
+2. **File: `USB_Host/Target/usbh_conf.c`** - `USBH_LL_Start()`:
+   ```c
+   /* Manual USB initialization with USB_CNTR_SOFM bit */
+   hhcd->Instance->CNTR = USB_CNTR_HOST | USB_CNTR_CTRM | 
+                          USB_CNTR_WKUPM | USB_CNTR_SUSPM | 
+                          USB_CNTR_SOFM;  // SOF enable is CRITICAL!
+   ```
+
+Without these, USB HOST will not enumerate devices!
 
 ---
 
@@ -25,79 +82,165 @@
 
 ### Build and Flash
 
+#### Method 1: VS Code CMake Tools
+1. Open project in VS Code
+2. Select "Debug" preset
+3. Press F7 to build
+4. Run task: "Flash and Run"
+
+#### Method 2: Command Line
 ```powershell
-# One-command build and flash
-cmake --build build --preset Debug
-STM32_Programmer_CLI -c port=SWD -w build/Debug/GP5_STM_V1.elf -rst
+# Build
+cmake --build C:\path\to\GP5_STM_V1\build\Debug
+
+# Flash
+STM32_Programmer_CLI -c port=SWD -w build/Debug/GP5_STM_V1.elf -v -rst
 ```
 
-### Connection Methods
+### Verify Successful Flash
 
-**Method 1: GP-5 Already Connected**
-- Connect GP-5 → Power STM32 → Instant connection
-
-**Method 2: Hot-Plug**  
-- Power STM32 → Connect GP-5 → Auto-reset after ~3s → Connected
-
-**Success Indicator**: Scene 1 LED turns ON
-
----
-
-## Scene Management Guide
-
-### Scene 1 - Preset Defaults (Built-In)
-
-**What It Does**: Instantly reloads GP-5 preset defaults
-
-**How To Use**:
-1. Select any preset (using GP-5 app, knob, or btnUp/btnDown)
-2. Modify effects (turn patches on/off)
-3. **Short press Scene 1** button
-4. GP-5 returns to preset defaults
-
-**Technical**: Sends MIDI CC#0 with current preset number  
-**LED**: Always ON (cannot be saved or deleted)
+Open serial monitor (115200 baud) and look for:
+```
+USB Power Enabled
+[MX_USB_Host_Init] USB HOST initialized and started
+=== STM32 USB MIDI Controller ===
+System Ready - Waiting for USB MIDI device...
+```
 
 ---
 
-### Scene 2 & 3 - User Programmable
+## Testing USB Connection
 
-#### Save a Scene
+### Connection Sequence
 
-1. **Select** preset on GP-5
-2. **Configure** patches (effects on/off) as desired
-3. **Long press** (2 seconds) Scene 2 or 3
-4. **LED blinks** to confirm detection
-5. **Release** → Scene saved to flash
-6. **LED solid** to confirm save
+**Recommended Order**:
+1. Power ON the GP-5
+2. Power ON the STM32 controller
+3. Connect USB cable between them
+4. Wait 2-3 seconds for enumeration
 
-**Example**: Save a "clean" version of Preset 33 to Scene 2
+**Success Messages** (via serial monitor):
+```
+[HCD] USB Port enabled
+USB Device Detected - Starting Enumeration
+USB: MIDI Class Selected
+USB MIDI Device Connected - VID: 0x84EF, PID: 0x0184
+MIDI Device Connected - Ready for operation
+[GP-5] Received Preset: 24
+```
 
-#### Recall a Scene
+### Troubleshooting Connection Issues
 
-1. **Short press** Scene 2 or 3
-2. If programmed → Patches switch instantly
-3. LED shows active scene
+**Problem**: No enumeration, stuck at "Waiting for USB MIDI device"
 
-**Fast Switching**: Only changes patches that differ from current state
+**Solutions**:
+1. **Check cable orientation**: Try flipping USB-C cable 180°
+2. **Verify VBUS**: Measure 5V on GP-5 USB port
+3. **Check HSE clock**: Serial should show system running at 48MHz
+4. **Verify USB_CNTR_SOFM**: Check that SOFM bit is set in CNTR register
+5. **Wait longer**: Enumeration can take up to 5 seconds
 
-#### Delete a Scene
+**Problem**: FNR register = 0 (no SOF packets)
 
-1. **Extra long press** (5 seconds) Scene 2 or 3
-2. **LED blinks fast** when threshold reached
-3. **Release** → Scene deleted
-4. System returns to Scene 1 (defaults)
+**Solution**: This means USB_CNTR_SOFM bit is NOT set. Review USB fixes in code.
 
 ---
 
-## Button Reference
+## Preset Management Quick Reference
 
-### Preset Navigation
-- **btnUp** (PC4): Next preset (CC#25)
-- **btnDown** (PC5): Previous preset (CC#24)
+### Save a Preset
+1. Set GP-5 to desired preset (using GP-5 controls)
+2. **Press a Bank button** to select which slot to save to
+3. **Hold Tap Tempo** for 2-5 seconds
+4. Release Tap Tempo
+5. Serial shows: `[BTN] Tap Tempo SAVE (2s): Requesting current GP-5 preset...`
+6. Serial shows: `[BTN] Preset saved successfully`
 
-### Scene Control  
-- **btnScene1** (PC1): 
+### Recall a Preset  
+1. **Press a Bank button** briefly
+2. GP-5 instantly switches to saved preset from that slot
+
+### Clear a Preset
+1. **Press the Bank button** of the slot you want to clear
+2. **Hold Tap Tempo** for more than 5 seconds
+3. Release Tap Tempo
+4. Serial shows: `[BTN] Tap Tempo CLEAR (5s): Bank X, Button Y`
+5. Serial shows: `[BTN] Preset cleared successfully`
+
+### CTL Function
+- **Press CTL button** → Sends CC#69 to GP-5
+- GP-5 toggles tuner or designated function
+
+---
+
+## LED Indicators (if implemented)
+
+### USB Connection LED
+- **OFF**: No USB device
+- **ON**: GP-5 connected and ready
+
+### Button LEDs (if implemented)
+- **Lit**: Preset saved to this button
+- **Dim**: Empty slot
+
+---
+
+## Serial Monitor Debug
+
+### Connect to Serial Port
+1. Open serial terminal (PuTTY, Tera Term, Arduino Serial Monitor)
+2. Settings: **115200 baud, 8N1, no flow control**
+3. Find ST-Link VCP COM port (check Device Manager on Windows)
+
+### Normal Operation Messages
+```
+USB MIDI Device Connected - VID: 0x84EF, PID: 0x0184
+[GP-5] Received Preset: 24
+[MIDI_Manager] Sending CC: Ch0 CC#0 = 24
+[PresetButtons] Recalling stored preset: GP-5 #24
+[BTN] Preset saved successfully
+```
+
+### Error Messages
+```
+[MIDI_Manager] ERROR: Cannot send CC - device not connected
+[HCD] *** FILTERED DISCONNECT during boot
+[GP-5] *** ERROR: Cannot request preset - no MIDI device connected ***
+```
+
+---
+
+## Next Steps
+
+- **User Guide**: See [USER_OPERATIONS_GUIDE.md](USER_OPERATIONS_GUIDE.md) for detailed button operations
+- **USB Technical**: See [USB_MIDI_HOST_CONFIGURATION_GUIDE.md](USB_MIDI_HOST_CONFIGURATION_GUIDE.md) for USB HOST implementation details
+- **Hardware**: See [HARDWARE_PORT_GUIDE.md](HARDWARE_PORT_GUIDE.md) for complete pinout
+
+---
+
+## Common Issues
+
+### USB Enumeration Fails
+- Verify USB_CNTR_SOFM bit is set (see USB fixes above)
+- Check clock source: Should be PLLQ at 48MHz or HSI48
+- Try different USB cable
+- Power cycle both devices
+
+### Preset Not Saving
+- Check Flash write success in serial monitor
+- Verify button debounce (50ms)
+- Ensure Tap Tempo held 2-5 seconds (not <2 or >5)
+
+### No Serial Output
+- Check ST-Link connection
+- Verify COM port and baud rate (115200)
+- Install ST-Link VCP drivers if needed
+
+---
+
+*Last Updated: February 6, 2026*
+*For STM32G0B1KBU6 with critical USB HOST fixes*
+ 
   - Short press: Recall preset defaults (CC#0)
   - Long/Extra-long press: No effect (Scene 1 cannot be programmed)
   

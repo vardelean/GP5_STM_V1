@@ -53,10 +53,12 @@
 ENTRY(Reset_Handler)
 
 /* Specify the memory areas */
+/* Reserve last 8KB (pages 60-63) for preset data storage */
 MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 144K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 128K
+FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 120K
+FLASH_DATA (r)  : ORIGIN = 0x0801E000, LENGTH = 8K
 }
 
 /* Highest address of the user mode stack */

@@ -4,36 +4,58 @@
 
 This document captures all critical configurations, workarounds, and implementation details required to build a working USB MIDI Host on STM32G0B1KBU6. Use this as a template when adapting the project to different microcontrollers or MIDI devices.
 
+**⚠️ CRITICAL**: STM32G0's USB_DRD peripheral requires manual initialization and SOF enable - the HAL driver alone is insufficient for HOST mode!
+
 ---
 
 ## Table of Contents
 
 1. [Hardware Requirements](#hardware-requirements)
-2. [USB Host Core Configuration](#usb-host-core-configuration)
-3. [MIDI Class Driver Modifications](#midi-class-driver-modifications)
-4. [Device-Specific Workarounds](#device-specific-workarounds)
-5. [Critical Buffer Sizes](#critical-buffer-sizes)
-6. [Timing Configurations](#timing-configurations)
-7. [GPIO and Interrupt Setup](#gpio-and-interrupt-setup)
-8. [Debugging Techniques](#debugging-techniques)
-9. [Common Issues and Solutions](#common-issues-and-solutions)
+2. [CRITICAL USB HOST Fix](#critical-usb-host-fix)
+3. [USB Host Core Configuration](#usb-host-core-configuration)
+4. [MIDI Class Driver Modifications](#midi-class-driver-modifications)
+5. [Device-Specific Workarounds](#device-specific-workarounds)
+6. [Critical Buffer Sizes](#critical-buffer-sizes)
+7. [Timing Configurations](#timing-configurations)
+8. [GPIO and Interrupt Setup](#gpio-and-interrupt-setup)
+9. [Debugging Techniques](#debugging-techniques)
+10. [Common Issues and Solutions](#common-issues-and-solutions)
 
 ---
 
 ## Hardware Requirements
 
 ### Minimum Specifications
-- **MCU**: STM32G0B1KBU6 (Cortex-M0+, 512KB Flash, 144KB RAM)
-- **USB**: Full-speed USB 2.0 (12 Mbps) with OTG/Host capability
-- **RAM**: Minimum 6.6KB for USB Host stack + MIDI buffers
-- **Flash**: Minimum 56KB for compiled code
+- **MCU**: STM32G0B1KBU6 (Cortex-M0+, 128KB Flash, 144KB RAM, UFQFPN32 package)
+- **USB**: Full-speed USB 2.0 (12 Mbps) with USB_DRD (Dual Role Device) peripheral
+- **RAM**: Minimum 6.5KB for USB Host stack + MIDI buffers
+- **Flash**: Minimum 77KB for compiled code with USB HOST
+- **Clock**: 48MHz (from HSE+PLL or HSI48) required for USB
 
-### Pin Configuration
-- **USB_DM/USB_DP**: PA11/PA12 (USB Data lines)
-- **USB_PWR**: PC0 (VBUS power control, GPIO output)
-- **Buttons**: PC1-PC6 (EXTI interrupts with pull-ups)
-- **LEDs**: PA0, PA1, PA4 (Open-drain outputs for active-low LEDs)
-- **UART**: PA2/PA3 (115200 baud for debug)
+### Pin Configuration (UFQFPN32)
+- **USB_DM**: PA11 (Pin 22 - USB Data Minus)
+- **USB_DP**: PA12 (Pin 23 - USB Data Plus)
+- **USB_PWR**: PB9 (VBUS power control, GPIO output)
+- **HSE_IN**: PC14 (Pin 2 - 8MHz external oscillator)
+- **Buttons**: PC4-PC6, PB3-PB5 (EXTI interrupts with pull-ups)
+- **LEDs**: Open-drain outputs
+- **UART**: PA2/PA3 (115200 baud for debug via ST-Link VCP)
+
+### Clock Configuration
+```c
+/* System Clock: 48MHz from HSE */
+RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;  // 8MHz external oscillator
+RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;   // 8MHz / 1 = 8MHz
+RCC_OscInitStruct.PLL.PLLN = 12;              // 8MHz * 12 = 96MHz VCO
+RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;   // 96MHz / 2 = 48MHz for USB
+RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;   // 96MHz / 2 = 48MHz for SYSCLK
+
+/* CRITICAL: Enable PLLQ output and route to USB */
+__HAL_RCC_PLLCLKOUT_ENABLE(RCC_PLLQCLK);
+MODIFY_REG(RCC->CCIPR2, RCC_CCIPR2_USBSEL_Msk, (2U << RCC_CCIPR2_USBSEL_Pos));
+```
 
 ### Power Management
 ```c
@@ -41,6 +63,88 @@ This document captures all critical configurations, workarounds, and implementat
 HAL_GPIO_WritePin(USB_PWR_GPIO_Port, USB_PWR_Pin, GPIO_PIN_SET);
 HAL_Delay(100);  // Critical: Allow VBUS to stabilize before enumeration
 ```
+
+---
+
+## CRITICAL USB HOST Fix
+
+### The Problem: No SOF Packets = No Enumeration
+
+STM32G0's USB_DRD peripheral HAL driver has a **critical bug**: it does not properly enable Start-of-Frame (SOF) packet generation, which is **mandatory** for USB HOST mode. Without SOF packets:
+- FNR register stays at 0
+- No 1ms frame timing
+- Devices cannot enumerate
+- gState stuck in HOST_IDLE or HOST_ABORT_STATE
+
+### The Solution: Manual USB Peripheral Initialization
+
+**File: `USB_Host/Target/usbh_conf.c` - `USBH_LL_Start()`**
+
+```c
+USBH_StatusTypeDef USBH_LL_Start(USBH_HandleTypeDef *phost)
+{
+  HAL_StatusTypeDef hal_status = HAL_OK;
+  USBH_StatusTypeDef usb_status = USBH_OK;
+  
+  HAL_Delay(500);  // Stabilization delay
+  
+  HCD_HandleTypeDef *hhcd = (HCD_HandleTypeDef*)phost->pData;
+  
+  /* CRITICAL: Manually initialize USB peripheral (HAL driver incomplete) */
+  
+  /* 1. Exit power-down mode */
+  hhcd->Instance->CNTR &= ~USB_CNTR_PDWN;
+  HAL_Delay(1);
+  
+  /* 2. Clear reset */
+  hhcd->Instance->CNTR &= ~USB_CNTR_USBRST;
+  
+  /* 3. Clear all interrupt flags */
+  hhcd->Instance->ISTR = 0;
+  
+  /* 4. Enable HOST mode and SOF (CRITICAL!) */
+  hhcd->Instance->CNTR = USB_CNTR_HOST |      // HOST mode enable
+                         USB_CNTR_CTRM |      // Correct transfer interrupt
+                         USB_CNTR_WKUPM |     // Wakeup interrupt
+                         USB_CNTR_SUSPM |     // Suspend interrupt
+                         USB_CNTR_SOFM;       // SOF enable (THE FIX!)
+  
+  /* 5. Enable D+ pull-down for HOST mode */
+  hhcd->Instance->BCDR |= USB_BCDR_DPPD;
+  
+  HAL_Delay(50);
+  
+  /* Still call HAL_HCD_Start for HAL state management */
+  hal_status = HAL_HCD_Start(phost->pData);
+  
+  HAL_Delay(100);
+  USBH_LL_Connect(phost);
+  
+  usb_status = USBH_Get_USB_Status(hal_status);
+  return usb_status;
+}
+```
+
+**Key Point**: The `USB_CNTR_SOFM` bit is what enables SOF packet generation. This bit is **NOT** set by `HAL_HCD_Start()`, causing HOST mode to fail silently.
+
+### Enable SOF in HCD Initialization
+
+**File: `USB_Host/Target/usbh_conf.c` - `USBH_LL_Init()`**
+
+```c
+USBH_StatusTypeDef USBH_LL_Init(USBH_HandleTypeDef *phost)
+{
+  // ... existing code ...
+  
+  hhcd_USB_DRD_FS.Init.Sof_enable = ENABLE;  // CRITICAL: Enable SOF
+  hhcd_USB_DRD_FS.Init.low_power_enable = DISABLE;
+  hhcd_USB_DRD_FS.Init.lpm_enable = DISABLE;
+  
+  // ... rest of initialization ...
+}
+```
+
+**Without these two changes, USB HOST mode will NOT work on STM32G0!**
 
 ---
 

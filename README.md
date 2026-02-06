@@ -8,29 +8,49 @@ A production-ready USB HOST MIDI controller for controlling the Valeton GP-5 gui
 
 > **Repository**: [github.com/vardelean/GP-5_STM32_Eval](https://github.com/vardelean/GP-5_STM32_Eval) (Private)
 
+**⚠️ IMPORTANT**: This project includes critical fixes for STM32G0's USB_DRD HOST mode (see [USB_MIDI_HOST_CONFIGURATION_GUIDE.md](USB_MIDI_HOST_CONFIGURATION_GUIDE.md))
+
+---
+
+## Quick Links
+
+- **[User Operations Guide](USER_OPERATIONS_GUIDE.md)** - How to use the controller (buttons, presets, CTL, Tap Tempo)
+- **[Quick Start Guide](QUICK_START.md)** - Hardware setup and first connection
+- **[USB HOST Configuration](USB_MIDI_HOST_CONFIGURATION_GUIDE.md)** - Critical USB fixes and technical details
+- **[Hardware Port Guide](HARDWARE_PORT_GUIDE.md)** - Pin assignments for STM32G0B1KBU6
+
 ---
 
 ## Project Status
 
-✅ **PRODUCTION READY** - December 20, 2025
+✅ **PRODUCTION READY** - February 6, 2026
 
-All core features implemented, tested, and optimized for live performance use.
+All core features implemented, tested, and optimized for live performance use on STM32G0B1KBU6 (UFQFPN32 package).
+
+### Latest Updates (February 2026)
+- ✅ **USB HOST working on STM32G0B1KBU6** - Critical USB_CNTR_SOFM fix discovered and implemented
+- ✅ Migrated from STM32G0B1RET6 (LQFP64, 512KB) to STM32G0B1KBU6 (UFQFPN32, 128KB)
+- ✅ Manual USB peripheral initialization to work around HAL driver limitations
+- ✅ 8MHz HSE oscillator with PLLQ for USB clock (48MHz)
+- ✅ Full preset management with 80 button slots (16 banks × 5 buttons)
+- ✅ Flash persistence across power cycles
+- ✅ Clean serial output with minimal debug messages
 
 ### Implementation Complete (Phase 8)
-- ✅ USB Host MIDI with hot-plug auto-reset
-- ✅ Scene management (Scene 1: defaults, Scene 2/3: programmable)
-- ✅ Flash persistence (1000 bytes optimized)
-- ✅ Button handling with state reset
-- ✅ GP-5 preset tracking from all sources
-- ✅ Optimized logging (DEBUG_VERBOSE flag)
-- ✅ Clean production code (CubeMX markers removed)
+- ✅ USB Host MIDI with hot-plug detection
+- ✅ Preset save/recall system (80 slots: 16 banks × 5 buttons)
+- ✅ Flash persistence (non-volatile storage)
+- ✅ Button handling with debounce
+- ✅ GP-5 preset tracking and synchronization
+- ✅ CTL and Tap Tempo functionality
+- ✅ Automatic preset recall on power-up
 
 ### Key Achievements
-- **Scene 1**: Always available - recalls GP-5 preset defaults via CC#0
-- **Scene 2 & 3**: User-programmable with flash persistence
-- **USB Hot-Plug**: Auto-reset after 3 disconnects enables connection after boot
-- **Flash Optimized**: 1000 bytes (10 bytes × 100 presets)
-- **Production Ready**: 62KB flash, minimal logging, robust button handling
+- **USB HOST on STM32G0**: First working implementation with documented fixes for HAL driver bugs
+- **Preset Management**: 80 quick-access slots (16 banks × 5 buttons) stored in Flash
+- **Auto-Recall**: Last-used preset automatically loaded on startup
+- **Compact**: 77KB flash usage, fits in 128KB STM32G0B1KBU6
+- **Production Ready**: Minimal logging, robust error handling, stable operation
 
 ---
 
@@ -38,91 +58,99 @@ All core features implemented, tested, and optimized for live performance use.
 
 ### USB HOST MIDI
 - Full USB HOST support for MIDI class devices
-- Automatic device detection with VID/PID identification
+- **CRITICAL FIX**: Manual USB_DRD initialization with SOF enable (see docs)
+- Automatic device detection with VID/PID identification (Valeton GP-5: 0x84EF/0x0184)
 - Send and receive SysEx messages
 - Send and receive Control Change (CC) messages
 - Device connection/disconnection notifications
 - Real-time MIDI data processing
+- Hot-plug support with disconnect filtering
 
+### Preset Management
+- **80 Preset Slots**: 16 banks × 5 buttons
+- Save current GP-5 preset to any button
+- Instant recall with button press
+- Clear saved presets
+- Flash storage (survives power cycles)
+- Automatic startup recall
 ### GPIO Button Control
-- **6 GPIO Buttons** with interrupt-driven operation:
-  - `btnUp` - PC4 (Preset Up)
-  - `btnDown` - PC5 (Preset Down)
-  - `btnScene1` - PC1 (Recall preset defaults)
-  - `btnScene2` - PC2 (User scene save/recall/delete)
-  - `btnScene3` - PC3 (User scene save/recall/delete)
-  - `btnTap` - PC6 (Future: Tap Tempo)
+- **5 Preset buttons** with **16 banks** (bank up/down navigation):
+  - **Preset Buttons 1-5**: Quick preset recall/save (80 total slots)
+  - **Bank Up/Down**: Navigate between banks 1-16
+  - **CTL**: Send CC#69 to GP-5 (tuner toggle)
+  - **Tap Tempo**: Preset save (2-5s hold) / clear (>5s hold)
 
 - **Button Features**:
   - Interrupt-driven with 50ms debounce
   - One button active at a time (mutual exclusion)
-  - **Short press** (< 2s): Recall/activate
-  - **Long press** (2-5s): Save scene (Scene 2/3 only)
-  - **Extra long press** (>5s): Delete scene (Scene 2/3 only)
+  - **Short press** (< 2s): Recall saved preset
+  - **Tap Tempo + Button** (2-5s): Save current GP-5 preset
+  - **Tap Tempo + Button** (>5s): Clear saved preset
   - State reset on release prevents false triggers
-
-### LED Control
-- **3 Scene LEDs** with exclusive operation:
-  - `ledScene1` - PA0
-  - `ledScene2` - PA1
-  - `ledScene3` - PA4
-
-- Only one LED active at a time
-- Automatically controlled by scene button presses
-
-### Flash Memory Storage
-- **Scene Database**: 1000 bytes (Page 254: 0x0807F000)
-  - 100 presets × 10 bytes each
-  - Scene 2 & 3 only (Scene 1 virtual)
-  - 5 bytes per scene (1 byte flag + 4 byte bitmap)
-- Automatic flash writes on scene save/delete
-- Full persistence across power cycles
-- RAM cache for fast scene lookups
 
 ### Serial Communication
 - UART2 for debugging via ST-Link Virtual COM Port
 - `printf()` support for easy debugging
 - Real-time event logging
 - MIDI message monitoring
+- 115200 baud, 8N1
+
+---
 
 ## Hardware Configuration
 
 ### Microcontroller
-- **Device**: STM32G0B1KBU6
-- **Board**: NUCLEO-G0B1RE
-- **Clock**: HSI48 for USB (48MHz)
-- **Debug**: ST-Link embedded debugger
+- **Device**: STM32G0B1KBU6 (UFQFPN32 package)
+- **Core**: ARM Cortex-M0+ @ 48MHz
+- **Flash**: 128KB
+- **RAM**: 144KB
+- **USB**: USB_DRD_FS (Dual Role Device - Full Speed)
+- **Package**: UFQFPN32 (5mm × 5mm, 0.5mm pitch)
+- **Debug**: SWD via ST-Link
 
-### Pin Assignment
+### Clock Configuration
+- **HSE**: 8MHz external oscillator (PC14 - OSC32_IN with BYPASS mode)
+- **PLL**: 8MHz × 12 / 1 = 96MHz VCO
+- **PLLQ**: 96MHz / 2 = 48MHz (USB clock)
+- **PLLR**: 96MHz / 2 = 48MHz (System clock)
+- **Alternative**: HSI48 for USB (48MHz internal RC oscillator)
+
+### Pin Assignment (UFQFPN32)
 
 #### USB HOST
-- USB_DM / USB_DP: USB data lines for HOST mode
-- USB_PWR: PC0 (USB power control)
+- **PA11** (Pin 22): USB_DM (USB Data Minus)
+- **PA12** (Pin 23): USB_DP (USB Data Plus)
+- **PB9**: USB_PWR (VBUS power control via P-channel MOSFET)
 
-#### Buttons (All with GPIO_PULLUP, GPIO_MODE_IT_RISING_FALLING)
-- btnUp: PC4
-- btnDown: PC5
-- btnScene1: PC1
-- btnScene2: PC2
-- btnScene3: PC3
-- btnTap: PC6
-
-#### LEDs (GPIO_MODE_OUTPUT_OD for scene LEDs)
-- ledScene1: PA0
-- ledScene2: PA1
-- ledScene3: PA4
-- LED_GREEN (Board LED): PA5
+#### Buttons
+- PC4, PC5, PB3, PB4, PB5: Bank buttons (with GPIO_PULLUP, EXTI)
+- PC6: CTL button
+- PC7: Tap Tempo button
 
 #### Serial Debug (USART2)
-- TX: PA2
-- RX: PA3
+- **PA2** (Pin 8): USART2_TX
+- **PA3** (Pin 9): USART2_RX
+
+#### Clock
+- **PC14** (Pin 2): OSC32_IN (8MHz external oscillator)
+
+#### Debug (SWD)
+- **PA13** (Pin 26): SWDIO
+- **PA14** (Pin 27): SWCLK
+
+### Power Requirements
+- **Supply Voltage**: 3.3V regulated
+- **USB VBUS**: 5V (provided to GP-5 via USB HOST port)
+- **Current Draw**: ~50mA typical, 150mA max (including GP-5)
+
+---
 
 ## Software Architecture
 
 ### Module Overview
 
 #### 1. USB HOST MIDI Driver (`usbh_midi.c/h`)
-Custom USB HOST class driver for MIDI devices:
+Custom USB HOST class driver for MIDI devices with critical fixes for STM32G0:
 - Device enumeration and initialization
 - Bulk transfer handling (IN/OUT)
 - MIDI packet formatting (USB-MIDI specification)

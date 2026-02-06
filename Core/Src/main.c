@@ -128,7 +128,7 @@ int main(void)
 
   /* Enable USB Power */
   HAL_GPIO_WritePin(USB_PWR_GPIO_Port, USB_PWR_Pin, GPIO_PIN_SET);
-  HAL_Delay(8000); // Wait for GP-5 to power up and stabilize
+  HAL_Delay(5000); // Wait for GP-5 to power up and stabilize
   printf("USB Power Enabled\r\n");
  
 
