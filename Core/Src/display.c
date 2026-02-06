@@ -51,10 +51,9 @@ void Display_BankNumber(uint8_t bankNum, SSD1306_COLOR color)
 
 void Display_PresetNumber(uint8_t presetNum)
 {
-    // Display preset number on OLED (show button number 0-4)
-    uint8_t buttonNum = presetNum % 5;
+    // Display preset number on OLED (1-5 for user)
     SSD1306_SetCursor(presetNumPosX, presetNumPosY);
-    SSD1306_WriteChar(0x30 + buttonNum, Font_19x26, White); 
+    SSD1306_WriteChar(0x30 + presetNum, Font_19x26, White); 
     SSD1306_UpdateScreen();  // Refresh display to show updated preset number
 }
 

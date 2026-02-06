@@ -1,10 +1,10 @@
 # GP-5 STM32 MIDI Controller
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-STM32G0B1RE-blue.svg)](https://www.st.com/en/microcontrollers-microprocessors/stm32g0b1re.html)
+[![Platform](https://img.shields.io/badge/Platform-STM32G0B1KBU6-blue.svg)](https://www.st.com/en/microcontrollers-microprocessors/STM32G0B1KBU6.html)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](QUICK_START.md)
 
-A production-ready USB HOST MIDI controller for controlling the Valeton GP-5 guitar effects pedal via STM32G0B1RE microcontroller.
+A production-ready USB HOST MIDI controller for controlling the Valeton GP-5 guitar effects pedal via STM32G0B1KBU6 microcontroller.
 
 > **Repository**: [github.com/vardelean/GP-5_STM32_Eval](https://github.com/vardelean/GP-5_STM32_Eval) (Private)
 
@@ -88,7 +88,7 @@ All core features implemented, tested, and optimized for live performance use.
 ## Hardware Configuration
 
 ### Microcontroller
-- **Device**: STM32G0B1RE
+- **Device**: STM32G0B1KBU6
 - **Board**: NUCLEO-G0B1RE
 - **Clock**: HSI48 for USB (48MHz)
 - **Debug**: ST-Link embedded debugger
@@ -381,7 +381,7 @@ This project uses STMicroelectronics HAL library and USB HOST library which are 
 ## References
 
 - [USB MIDI Specification](https://www.usb.org/sites/default/files/midi10.pdf)
-- [STM32G0B1RE Datasheet](https://www.st.com/resource/en/datasheet/stm32g0b1re.pdf)
+- [STM32G0B1KBU6 Datasheet](https://www.st.com/resource/en/datasheet/STM32G0B1KBU6.pdf)
 - [NUCLEO-G0B1RE User Manual](https://www.st.com/resource/en/user_manual/um2324-stm32-nucleo64-boards-mb1360-stmicroelectronics.pdf)
 - [STM32 USB HOST Library](https://www.st.com/en/embedded-software/stsw-stm32046.html)
 

@@ -41,23 +41,30 @@ USBH_StatusTypeDef USBH_Get_USB_Status(HAL_StatusTypeDef hal_status);
 
 void HAL_HCD_MspInit(HCD_HandleTypeDef* hcdHandle)
 {
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
   if(hcdHandle->Instance==USB_DRD_FS)
   {
   /* Set start time for disconnect filtering */
   usb_host_start_time = HAL_GetTick();
-  printf("[HAL_HCD_MspInit] USB host initialization started at %lu ms\r\n", usb_host_start_time);
-  /** Initializes the peripherals clocks
-  */
-    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
-    PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-    {
-      Error_Handler();
-    }
+  
+  /* NOTE: USB clock source already configured in SystemClock_Config() */
 
     /* Peripheral clock enable */
     __HAL_RCC_USB_CLK_ENABLE();
+    
+    /* Enable SYSCFG clock for USB configuration */
+    __HAL_RCC_SYSCFG_CLK_ENABLE();
+    
+    /* Configure USB pins PA11=DM and PA12=DP (pins 22-23 on UFQFPN32) */
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    
+    /* PA11 and PA12 are the native USB pins on UFQFPN32 - NO remapping needed */
+    GPIO_InitStruct.Pin = GPIO_PIN_11 | GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF2_USB;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     /* Enable VDDUSB */
     if(__HAL_RCC_PWR_IS_CLK_DISABLED())
@@ -212,7 +219,6 @@ void HAL_HCD_PortDisabled_Callback(HCD_HandleTypeDef *hhcd)
   */
 USBH_StatusTypeDef USBH_LL_Init(USBH_HandleTypeDef *phost)
 {
-  printf("[USBH_LL_Init] Initializing USB HOST Low Level\r\n");
   /* Init USB_IP */
   if (phost->id == HOST_FS) {
   /* Link the driver to the stack. */
@@ -224,41 +230,29 @@ USBH_StatusTypeDef USBH_LL_Init(USBH_HandleTypeDef *phost)
   hhcd_USB_DRD_FS.Init.Host_channels = 8;
   hhcd_USB_DRD_FS.Init.speed = HCD_SPEED_FULL;
   hhcd_USB_DRD_FS.Init.phy_itface = HCD_PHY_EMBEDDED;
-  hhcd_USB_DRD_FS.Init.Sof_enable = DISABLE;
+  hhcd_USB_DRD_FS.Init.Sof_enable = ENABLE;  /* CRITICAL: Enable SOF for USB HOST mode */
   hhcd_USB_DRD_FS.Init.low_power_enable = DISABLE;
   hhcd_USB_DRD_FS.Init.lpm_enable = DISABLE;
   hhcd_USB_DRD_FS.Init.battery_charging_enable = ENABLE;  /* Enable BCD for GP-5 detection */
   hhcd_USB_DRD_FS.Init.vbus_sensing_enable = DISABLE;
   hhcd_USB_DRD_FS.Init.bulk_doublebuffer_enable = DISABLE;
   hhcd_USB_DRD_FS.Init.iso_singlebuffer_enable = DISABLE;
-  printf("[USBH_LL_Init] Calling HAL_HCD_Init (with BCD enabled)...\r\n");
   if (HAL_HCD_Init(&hhcd_USB_DRD_FS) != HAL_OK)
   {
-    printf("[USBH_LL_Init] ERROR: HAL_HCD_Init failed!\r\n");
     Error_Handler( );
   }
-  printf("[USBH_LL_Init] HAL_HCD_Init successful\r\n");
   
   /* Add delay for USB peripheral to stabilize */
   HAL_Delay(100);
   
   /* Force USB HOST mode - disable device mode detection */
-  /* This helps when using direct wire connections without proper USB connector */
   hhcd_USB_DRD_FS.Instance->CNTR |= USB_CNTR_HOST;  /* Force HOST mode */
   
-  /* CRITICAL FIX: Manually enable D+ pull-down for HOST mode
-   * Some USB devices (like GP-5) check for HOST pull-downs before enabling their pull-up
-   * The STM32G0 HAL doesn't always configure this correctly in HOST mode
-   */
+  /* Enable D+ pull-down for HOST mode */
   hhcd_USB_DRD_FS.Instance->BCDR |= USB_BCDR_DPPD;  /* Enable D+ pull-down (15kΩ to GND) */
-  
-  /* Check USB registers for diagnostics */
-  printf("[USBH_LL_Init] USB State: 0x%08lX\r\n", (unsigned long)hhcd_USB_DRD_FS.Instance->CNTR);
-  printf("[USBH_LL_Init] USB BCDR: 0x%08lX\r\n", (unsigned long)hhcd_USB_DRD_FS.Instance->BCDR);
 
   USBH_LL_SetTimer(phost, HAL_HCD_GetCurrentFrame(&hhcd_USB_DRD_FS));
   }
-  printf("[USBH_LL_Init] Complete\r\n");
   return USBH_OK;
 }
 
@@ -292,27 +286,42 @@ USBH_StatusTypeDef USBH_LL_Start(USBH_HandleTypeDef *phost)
   /* Check if restart is disabled due to too many failures */
   if (usb_restart_disabled)
   {
-    printf("[USBH_LL_Start] *** RESTART DISABLED - Manual reset required ***\r\n");
     return USBH_FAIL;
   }
 
-  printf("[USBH_LL_Start] Starting HCD...\r\n");
-  
   /* Add delay to prevent rapid restart loop */
   HAL_Delay(500);
   
-  /* NOTE: Do NOT update usb_host_start_time here - it's set once in MSP init */
-  hal_status = HAL_HCD_Start(phost->pData);
-  printf("[USBH_LL_Start] HAL_HCD_Start returned: %d\r\n", hal_status);
+  HCD_HandleTypeDef *hhcd = (HCD_HandleTypeDef*)phost->pData;
   
-  /* CRITICAL: Enable D+ pull-down AFTER starting HCD
-   * HAL_HCD_Start may reset BCDR register, so we must set it here
-   */
-  hhcd_USB_DRD_FS.Instance->BCDR |= USB_BCDR_DPPD;  /* Enable D+ pull-down (15kΩ) */
-  printf("[USBH_LL_Start] BCDR after pull-down enable: 0x%08lX\r\n", 
-         (unsigned long)hhcd_USB_DRD_FS.Instance->BCDR);
+  /* CRITICAL: Manually initialize USB peripheral (HAL driver incomplete) */
+  /* 1. Exit power-down mode */
+  hhcd->Instance->CNTR &= ~USB_CNTR_PDWN;
+  HAL_Delay(1);
+  
+  /* 2. Clear reset */
+  hhcd->Instance->CNTR &= ~USB_CNTR_USBRST;
+  
+  /* 3. Clear all interrupt flags */
+  hhcd->Instance->ISTR = 0;
+  
+  /* 4. Enable HOST mode and SOF */
+  hhcd->Instance->CNTR = USB_CNTR_HOST | USB_CNTR_CTRM | USB_CNTR_WKUPM | USB_CNTR_SUSPM | USB_CNTR_SOFM;
+  
+  /* 5. Enable D+ pull-down for HOST mode */
+  hhcd->Instance->BCDR |= USB_BCDR_DPPD;
+  
+  HAL_Delay(50);
+  
+  /* Still call HAL_HCD_Start for HAL state management */
+  hal_status = HAL_HCD_Start(phost->pData);
+  
+  /* Device is already connected at startup, manually trigger connection */
+  HAL_Delay(100);
+  USBH_LL_Connect(phost);
 
   usb_status = USBH_Get_USB_Status(hal_status);
+
 
   return usb_status;
 }

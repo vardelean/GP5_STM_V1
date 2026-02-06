@@ -61,8 +61,8 @@ static bool tunerOn = false;             /* Tuner state */
 /* Tap tempo variables */
 static uint32_t lastTapTime = 0;         /* Last tap tempo press time */
 static uint32_t tempoMs = 0;             /* Tempo in milliseconds */
-#define TAP_TEMPO_MIN_MS    20          /* Fastest tempo (20ms) */
-#define TAP_TEMPO_MAX_MS    1000        /* Slowest tempo (1000ms) */
+#define TAP_TEMPO_MIN_MS    20           /* Fastest tempo (20ms = 3000 BPM) */
+#define TAP_TEMPO_MAX_MS    2000         /* Slowest tempo (2000ms = 30 BPM) */
 
 /* External variables --------------------------------------------------------*/
 
@@ -214,13 +214,18 @@ void PresetButtons_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       else if (GPIO_Pin == btnCtl_Pin)
       {
         isCtlButton = true;
+        buttonState = BTN_STATE_PRESSED;
+        pressedButton = GPIO_Pin;
+        buttonPressTime = HAL_GetTick();
         printf("[BTN] CTL pressed - hold for 2s to toggle tuner\r\n");
       }
       else if (GPIO_Pin == btnTapTempo_Pin)
       {
         isTapTempoButton = true;
-        printf("[BTN] Tap Tempo pressed - hold for save (2s) or clear (5s) - time=%lu\r\n", 
-               buttonPressTime);
+        buttonState = BTN_STATE_PRESSED;
+        pressedButton = GPIO_Pin;
+        buttonPressTime = HAL_GetTick();
+        printf("[BTN] Tap Tempo pressed - hold for save (2s) or clear (5s)\r\n");
       }
     }
   }

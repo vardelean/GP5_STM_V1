@@ -6,7 +6,7 @@
 **
 **  Author		: STM32CubeMX
 **
-**  Abstract    : Linker script for STM32G0B1RETx series
+**  Abstract    : Linker script for STM32G0B1KBU6Tx series
 **                512Kbytes FLASH and 144Kbytes RAM
 **
 **                Set heap size, stack size and stack location according
@@ -56,7 +56,7 @@ ENTRY(Reset_Handler)
 MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 144K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 512K
+FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 128K
 }
 
 /* Highest address of the user mode stack */

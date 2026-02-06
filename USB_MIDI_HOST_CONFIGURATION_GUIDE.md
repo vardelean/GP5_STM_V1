@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document captures all critical configurations, workarounds, and implementation details required to build a working USB MIDI Host on STM32G0B1RE. Use this as a template when adapting the project to different microcontrollers or MIDI devices.
+This document captures all critical configurations, workarounds, and implementation details required to build a working USB MIDI Host on STM32G0B1KBU6. Use this as a template when adapting the project to different microcontrollers or MIDI devices.
 
 ---
 
@@ -23,7 +23,7 @@ This document captures all critical configurations, workarounds, and implementat
 ## Hardware Requirements
 
 ### Minimum Specifications
-- **MCU**: STM32G0B1RE (Cortex-M0+, 512KB Flash, 144KB RAM)
+- **MCU**: STM32G0B1KBU6 (Cortex-M0+, 512KB Flash, 144KB RAM)
 - **USB**: Full-speed USB 2.0 (12 Mbps) with OTG/Host capability
 - **RAM**: Minimum 6.6KB for USB Host stack + MIDI buffers
 - **Flash**: Minimum 56KB for compiled code

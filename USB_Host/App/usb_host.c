@@ -47,16 +47,27 @@ static void USBH_UserProcess(USBH_HandleTypeDef *phost, uint8_t id);
 void MX_USB_Host_Init(void)
 {
   /* Init host Library, add supported class and start the library. */
+  printf("[MX_USB_Host_Init] Calling USBH_Init...\r\n");
   if (USBH_Init(&hUsbHostFS, USBH_UserProcess, HOST_FS) != USBH_OK)
   {
+    printf("[MX_USB_Host_Init] ERROR: USBH_Init failed!\r\n");
     Error_Handler();
   }
+  printf("[MX_USB_Host_Init] USBH_Init successful, pUser callback: 0x%08lX\r\n", 
+         (unsigned long)hUsbHostFS.pUser);
+  
+  printf("[MX_USB_Host_Init] Registering MIDI class...\r\n");
   if (USBH_RegisterClass(&hUsbHostFS, USBH_MIDI_CLASS) != USBH_OK)
   {
+    printf("[MX_USB_Host_Init] ERROR: USBH_RegisterClass failed!\r\n");
     Error_Handler();
   }
+  printf("[MX_USB_Host_Init] MIDI class registered\r\n");
+  
+  printf("[MX_USB_Host_Init] Starting USB Host...\r\n");
   if (USBH_Start(&hUsbHostFS) != USBH_OK)
   {
+    printf("[MX_USB_Host_Init] ERROR: USBH_Start failed!\r\n");
     Error_Handler();
   }
   
@@ -69,16 +80,7 @@ void MX_USB_Host_Init(void)
 void MX_USB_HOST_Process(void)
 {
   /* USB Host Background task */
-  static HOST_StateTypeDef last_state = HOST_IDLE;
-  
   USBH_Process(&hUsbHostFS);
-  
-  /* Print state changes for debugging */
-  if (hUsbHostFS.gState != last_state)
-  {
-    printf("[USB_HOST] State: %d\r\n", hUsbHostFS.gState);
-    last_state = hUsbHostFS.gState;
-  }
 }
 /*
  * user callback definition
@@ -86,6 +88,8 @@ void MX_USB_HOST_Process(void)
 static void USBH_UserProcess  (USBH_HandleTypeDef *phost, uint8_t id)
 {
   extern void USB_MIDI_ConnectionCallback(uint8_t event);
+  
+  printf("[USBH_UserProcess] Event ID: %d, gState: %d\r\n", id, phost->gState);
   
   switch(id)
   {

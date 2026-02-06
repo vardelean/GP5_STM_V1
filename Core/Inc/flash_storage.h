@@ -25,23 +25,23 @@ extern "C" {
 #define PRESET_EMPTY            0xFF    /* Empty preset value */
 #define PRESET_VALID_MAX        99      /* Maximum valid GP-5 preset number */
 
-/* Flash page configuration (STM32G0B1: 2KB pages, 512KB total) */
+/* Flash page configuration (STM32G0B1KB: 2KB pages, 128KB total = 64 pages) */
 /* Note: FLASH_PAGE_SIZE is already defined in stm32g0xx_hal_flash.h */
 #define PRESET_DATA_PAGES       2       /* Use 2 pages for preset storage */
 #define FLASH_START_ADDRESS     0x08000000
-#define FLASH_TOTAL_SIZE        (512 * 1024)
+#define FLASH_TOTAL_SIZE        (128 * 1024)
 
-/* Use last 4 pages of Flash for preset storage (pages 252-255) */
-/* Page 252-253: Preset array A and B (dual array with redundancy) */
-/* Page 254: Current preset index with wear leveling */
-/* Page 255: Initialization flag */
-#define PRESET_STORAGE_PAGE     252
+/* Use last 4 pages of Flash for preset storage (pages 60-63) */
+/* Page 60-61: Preset array A and B (dual array with redundancy) */
+/* Page 62: Current preset index with wear leveling */
+/* Page 63: Initialization flag */
+#define PRESET_STORAGE_PAGE     60
 #define PRESET_STORAGE_ADDRESS  (FLASH_START_ADDRESS + (PRESET_STORAGE_PAGE * FLASH_PAGE_SIZE))
 
-#define CURRENT_PRESET_PAGE     254
+#define CURRENT_PRESET_PAGE     62
 #define CURRENT_PRESET_ADDRESS  (FLASH_START_ADDRESS + (CURRENT_PRESET_PAGE * FLASH_PAGE_SIZE))
 
-#define INIT_FLAG_PAGE          255
+#define INIT_FLAG_PAGE          63
 #define INIT_FLAG_ADDRESS       (FLASH_START_ADDRESS + (INIT_FLAG_PAGE * FLASH_PAGE_SIZE))
 #define INIT_FLAG_VALUE         0xA5A5A5A5  /* Magic number indicating initialization */
 

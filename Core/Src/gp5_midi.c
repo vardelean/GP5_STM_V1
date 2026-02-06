@@ -70,7 +70,7 @@ void GP5_MIDI_RequestPresetNumber(void)
 {
   if (!midi_device_connected)
   {
-    printf("[GP-5] Cannot request preset - no MIDI device connected\r\n");
+    printf("[GP-5] *** ERROR: Cannot request preset - no MIDI device connected ***\r\n");
     return;
   }
   
@@ -114,12 +114,9 @@ bool GP5_MIDI_ParsePresetNumber(uint8_t *data, uint16_t len, uint8_t *preset)
       return false;  /* Invalid preset number */
     }
     
-    printf("[ParsePreset] SUCCESS! Extracted preset: %d (from bytes 13=0x%02X, 14=0x%02X)\r\n", 
-           *preset, data[13], data[14]);
     return true;
   }
   
-  printf("[ParsePreset] Pattern mismatch\r\n");
   return false;
 }
 
@@ -304,7 +301,7 @@ void GP5_MIDI_ProcessReceivedData(uint8_t *data, uint16_t length)
       {
         currentPresetNumber = preset;
         presetNumberValid = true;
-        printf("[GP-5] Preset Number: %d\r\n", preset);
+        printf("[GP-5] Received Preset: %d\r\n", preset);
         
         /* Notify preset button handler */
         PresetButtons_SetCurrentPreset(preset);

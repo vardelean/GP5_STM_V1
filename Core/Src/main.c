@@ -110,12 +110,16 @@ int main(void)
   HAL_Init();
   /* Configure the system clock */
   SystemClock_Config();
+  
+  /* CRITICAL: Update SystemCoreClock variable and reconfigure SysTick for 48MHz */
+  SystemCoreClockUpdate();
+  HAL_InitTick(TICK_INT_PRIORITY);
+  
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
 
   MX_USART2_UART_Init();
   MX_I2C2_Init();
-  
   
   // Initialize display
   SSD1306_Init(&hi2c2);
@@ -124,7 +128,7 @@ int main(void)
 
   /* Enable USB Power */
   HAL_GPIO_WritePin(USB_PWR_GPIO_Port, USB_PWR_Pin, GPIO_PIN_SET);
-  HAL_Delay(3000); // Wait for GP-5 to power up
+  HAL_Delay(8000); // Wait for GP-5 to power up and stabilize
   printf("USB Power Enabled\r\n");
  
 
@@ -200,58 +204,59 @@ void SystemClock_Config(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-   */
+  */
   HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-   * in the RCC_OscInitTypeDef structure.
-   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI | RCC_OSCILLATORTYPE_HSI48;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
-  RCC_OscInitStruct.HSIDiv = RCC_HSI_DIV1;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;  // External 8MHz oscillator on PC14
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;   // 8MHz / 1 = 8MHz
+  RCC_OscInitStruct.PLL.PLLN = 12;              // 8MHz * 12 = 96MHz VCO
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;   // 96MHz / 2 = 48MHz (unused)
+  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;   // 96MHz / 2 = 48MHz for USB
+  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;   // 96MHz / 2 = 48MHz for SYSCLK
+  
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
+  
+  /* Verify PLL is locked and running */
+  uint32_t timeout = 1000;
+  while (!(RCC->CR & RCC_CR_PLLRDY) && --timeout);
+  if (timeout == 0)
+  {
+    Error_Handler();  /* PLL failed to lock */
+  }
+  
+  /* CRITICAL: Enable PLLQ output for USB AFTER PLL configuration */
+  __HAL_RCC_PLLCLKOUT_ENABLE(RCC_PLLQCLK);
+  
+  /* CRITICAL: Select PLLQ as USB clock source - set bits [13:12] of CCIPR2 to 0b10 */
+  MODIFY_REG(RCC->CCIPR2, RCC_CCIPR2_USBSEL_Msk, (2U << RCC_CCIPR2_USBSEL_Pos));
 
   /** Initializes the CPU, AHB and APB buses clocks
-   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
   {
     Error_Handler();
   }
 
-/* NOTE: CRS synchronization disabled for USB HOST mode
- * CRS_SYNC_SOURCE_USB only works in USB DEVICE mode (syncs to incoming SOF from host).
- * In USB HOST mode, we generate the SOF, so there's nothing to sync to.
- * HSI48 free-running accuracy should be sufficient for USB HOST.
- * If issues persist, consider using an external crystal (HSE).
- */
-#if 0 /* Disable CRS for USB HOST */
-   /** Enable the SYSCFG APB clock
+  /** Enables the Clock Security System
   */
-  __HAL_RCC_CRS_CLK_ENABLE();
-
-  /** Configures CRS
-  */
-  pInit.Prescaler = RCC_CRS_SYNC_DIV1;
-  pInit.Source = RCC_CRS_SYNC_SOURCE_USB;
-  pInit.Polarity = RCC_CRS_SYNC_POLARITY_RISING;
-  pInit.ReloadValue = __HAL_RCC_CRS_RELOADVALUE_CALCULATE(48000000,1000);
-  pInit.ErrorLimitValue = 34;
-  pInit.HSI48CalibrationValue = 32;
-
-  HAL_RCCEx_CRSConfig(&pInit);
-#endif
+  HAL_RCC_EnableCSS();
 }
+
 /**
  * @brief  This function is executed in case of error occurrence.
  * @retval None
