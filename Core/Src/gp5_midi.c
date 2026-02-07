@@ -10,6 +10,7 @@
 #include "gp5_midi.h"
 #include "midi_manager.h"
 #include "preset_buttons.h"
+#include "debug.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -42,7 +43,7 @@ extern uint8_t midi_device_connected;
   */
 void GP5_MIDI_Init(void)
 {
-  printf("GP-5 MIDI initialized\r\n");
+  DEBUG_PRINTF("GP-5 MIDI initialized\r\n");
   
   /* Initialize state tracking */
   presetNumberValid = false;
@@ -58,7 +59,7 @@ void GP5_MIDI_Init(void)
   */
 void GP5_MIDI_RequestInitialPreset(void)
 {
-  printf("[GP-5] Requesting initial preset...\r\n");
+  DEBUG_PRINTF("[GP-5] Requesting initial preset...\r\n");
   GP5_MIDI_RequestPresetNumber();
 }
 
@@ -70,7 +71,7 @@ void GP5_MIDI_RequestPresetNumber(void)
 {
   if (!midi_device_connected)
   {
-    printf("[GP-5] *** ERROR: Cannot request preset - no MIDI device connected ***\r\n");
+    DEBUG_PRINTF("[GP-5] *** ERROR: Cannot request preset - no MIDI device connected ***\r\n");
     return;
   }
   
@@ -97,7 +98,7 @@ bool GP5_MIDI_ParsePresetNumber(uint8_t *data, uint16_t len, uint8_t *preset)
     
   if (data[0] != 0xF0 || data[len-1] != 0xF7)
   {
-    printf("[ParsePreset] Missing F0 or F7\r\n");
+    DEBUG_PRINTF("[ParsePreset] Missing F0 or F7\r\n");
     return false;
   }
     
@@ -110,7 +111,7 @@ bool GP5_MIDI_ParsePresetNumber(uint8_t *data, uint16_t len, uint8_t *preset)
     
     if (*preset > 99)
     {
-      printf("[ParsePreset] Invalid preset: %d\r\n", *preset);
+      DEBUG_PRINTF("[ParsePreset] Invalid preset: %d\r\n", *preset);
       return false;  /* Invalid preset number */
     }
     
@@ -152,7 +153,7 @@ void GP5_MIDI_RequestPatchInfo(void)
 {
   if (!midi_device_connected)
   {
-    printf("[GP-5] Cannot request patch info - no MIDI device connected\r\n");
+    DEBUG_PRINTF("[GP-5] Cannot request patch info - no MIDI device connected\r\n");
     return;
   }
   
@@ -160,7 +161,7 @@ void GP5_MIDI_RequestPatchInfo(void)
   uint8_t patch_request[] = {0xF0, 0x00, 0x01, 0x0C, 0x00, 0x10, 0x00, 0xF7};
   
   if (DEBUG_VERBOSE)
-    printf("[GP-5] Sending patch info request\r\n");
+    DEBUG_PRINTF("[GP-5] Sending patch info request\r\n");
     
   MIDI_Manager_SendSysEx(patch_request, sizeof(patch_request));
 }
@@ -218,7 +219,7 @@ void GP5_MIDI_SetPatchState(uint8_t patchCC, bool turnOn)
 {
   if (!midi_device_connected)
   {
-    printf("[GP-5] Cannot set patch - no MIDI device connected\r\n");
+    DEBUG_PRINTF("[GP-5] Cannot set patch - no MIDI device connected\r\n");
     return;
   }
   
@@ -226,7 +227,7 @@ void GP5_MIDI_SetPatchState(uint8_t patchCC, bool turnOn)
   uint8_t value = turnOn ? 127 : 0;
   
   if (DEBUG_VERBOSE)
-    printf("[GP-5] CC#%d = %d\r\n", patchCC, value);
+    DEBUG_PRINTF("[GP-5] CC#%d = %d\r\n", patchCC, value);
     
   MIDI_Manager_SendCC(GP5_MIDI_CHANNEL, patchCC, value);
   
@@ -301,7 +302,7 @@ void GP5_MIDI_ProcessReceivedData(uint8_t *data, uint16_t length)
       {
         currentPresetNumber = preset;
         presetNumberValid = true;
-        printf("[GP-5] Received Preset: %d\r\n", preset);
+        DEBUG_PRINTF("[GP-5] Received Preset: %d\r\n", preset);
         
         /* Notify preset button handler */
         PresetButtons_SetCurrentPreset(preset);
@@ -316,7 +317,7 @@ void GP5_MIDI_ProcessReceivedData(uint8_t *data, uint16_t length)
       /* Check for Patch Info Response */
       else if (GP5_MIDI_ParsePatchInfo(sysex_buffer, sysex_index, &patchBitmap))
       {
-        printf("[GP-5] Patch Info: 0x%08lX\r\n", patchBitmap);
+        DEBUG_PRINTF("[GP-5] Patch Info: 0x%08lX\r\n", patchBitmap);
         
         /* Update current state */
         currentPatchState.patchNR  = (patchBitmap >> 8) & 1;
@@ -331,7 +332,7 @@ void GP5_MIDI_ProcessReceivedData(uint8_t *data, uint16_t length)
         currentPatchState.patchRVB = (patchBitmap >> 17) & 1;
         currentStateValid = true;
         
-        printf("[GP-5] Patches: NR=%d PRE=%d DST=%d NS=%d AMP=%d CAB=%d EQ=%d MOD=%d DLY=%d RVB=%d\r\n",
+        DEBUG_PRINTF("[GP-5] Patches: NR=%d PRE=%d DST=%d NS=%d AMP=%d CAB=%d EQ=%d MOD=%d DLY=%d RVB=%d\r\n",
                currentPatchState.patchNR, currentPatchState.patchPRE,
                currentPatchState.patchDST, currentPatchState.patchNS,
                currentPatchState.patchAMP, currentPatchState.patchCAB,
@@ -340,10 +341,12 @@ void GP5_MIDI_ProcessReceivedData(uint8_t *data, uint16_t length)
       }
       else if (DEBUG_VERBOSE)
       {
-        printf("[GP-5] Unknown SysEx (%d bytes)\r\n", sysex_index);
+        DEBUG_PRINTF("[GP-5] Unknown SysEx (%d bytes)\r\n", sysex_index);
       }
       
       sysex_index = 0;
     }
   }
 }
+
+

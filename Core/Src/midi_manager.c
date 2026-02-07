@@ -8,6 +8,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "midi_manager.h"
+#include "debug.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -66,7 +67,7 @@ void MIDI_Manager_Process(void)
   {
     if (!device_connected)
     {
-      printf("[MIDI_Manager] MIDI device now CONNECTED\r\n");
+      DEBUG_PRINTF("[MIDI_Manager] MIDI device now CONNECTED\r\n");
     }
     device_connected = 1;
     
@@ -90,7 +91,7 @@ void MIDI_Manager_Process(void)
   {
     if (device_connected)
     {
-      printf("[MIDI_Manager] MIDI device DISCONNECTED (gState changed from HOST_CLASS)\r\n");
+      DEBUG_PRINTF("[MIDI_Manager] MIDI device DISCONNECTED (gState changed from HOST_CLASS)\r\n");
     }
     device_connected = 0;
   }
@@ -123,11 +124,11 @@ void MIDI_Manager_SendCC(uint8_t channel, uint8_t controller, uint8_t value)
 {
   if (usb_host_handle == NULL || !device_connected)
   {
-    printf("[MIDI_Manager] ERROR: Cannot send CC - device not connected\r\n");
+    DEBUG_PRINTF("[MIDI_Manager] ERROR: Cannot send CC - device not connected\r\n");
     return;
   }
   
-  printf("[MIDI_Manager] Sending CC: Ch%d CC#%d = %d\r\n", channel, controller, value);
+  DEBUG_PRINTF("[MIDI_Manager] Sending CC: Ch%d CC#%d = %d\r\n", channel, controller, value);
   USBH_MIDI_SendControlChange(usb_host_handle, channel, controller, value);
 }
 
@@ -175,3 +176,5 @@ void MIDI_Manager_RegisterReceiveCallback(MIDI_ReceiveCallback_t callback)
 {
   receive_callback = callback;
 }
+
+

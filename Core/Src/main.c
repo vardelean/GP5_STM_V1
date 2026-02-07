@@ -28,6 +28,7 @@
 #include "midi_manager.h"
 #include "gp5_midi.h"
 #include "preset_buttons.h"
+#include "debug.h"
 #include <stdio.h>
 #include <string.h>
 /* Private typedef -----------------------------------------------------------*/
@@ -37,7 +38,9 @@
 extern USBH_HandleTypeDef hUsbHostFS;
 
 void USB_MIDI_ConnectionCallback(uint8_t connected);
+#ifdef DEBUG
 int _write(int file, char *ptr, int len);
+#endif
 uint8_t midi_device_connected = 0;
 uint32_t midi_connection_time = 0;  /* Time when MIDI device connected */
 uint8_t preset_request_pending = 0; /* Flag to request preset after delay */
@@ -46,17 +49,21 @@ uint8_t preset_request_pending = 0; /* Flag to request preset after delay */
 void SystemClock_Config(void);
 void MX_USB_HOST_Process(void);
 void USB_MIDI_ConnectionCallback(uint8_t connected);
+#ifdef DEBUG
 int _write(int file, char *ptr, int len);
+#endif
 
 /* Private user code ---------------------------------------------------------*/
+#ifdef DEBUG
 /**
- * @brief Retarget printf to UART2
+ * @brief Retarget printf to UART2 (Debug builds only)
  */
 int _write(int file, char *ptr, int len)
 {
   HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, HAL_MAX_DELAY);
   return len;
 }
+#endif
 
 /**
  * @brief USB MIDI connection callback
@@ -69,16 +76,16 @@ void USB_MIDI_ConnectionCallback(uint8_t connected)
   {
     uint16_t vid, pid;
     MIDI_Manager_GetDeviceInfo(&vid, &pid);
-    printf("MIDI Device Connected - Ready for operation\r\n");
+    DEBUG_PRINTF("MIDI Device Connected - Ready for operation\r\n");
 
     /* Schedule preset request after delay (handled in main loop) */
     midi_connection_time = HAL_GetTick();
     preset_request_pending = 1;
-    printf("[GP-5] Will request preset number after 1 second...\r\n");
+    DEBUG_PRINTF("[GP-5] Will request preset number after 1 second...\r\n");
   }
   else
   {
-    printf("MIDI Device Disconnected\r\n");
+    DEBUG_PRINTF("MIDI Device Disconnected\r\n");
     preset_request_pending = 0;
   }
 }
@@ -118,7 +125,10 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
 
-  MX_USART2_UART_Init();
+#ifdef DEBUG
+  MX_USART2_UART_Init();  /* Debug UART - only in Debug builds */
+#endif
+
   MX_I2C2_Init();
   
   // Initialize display
@@ -129,13 +139,13 @@ int main(void)
   /* Enable USB Power */
   HAL_GPIO_WritePin(USB_PWR_GPIO_Port, USB_PWR_Pin, GPIO_PIN_SET);
   HAL_Delay(5000); // Wait for GP-5 to power up and stabilize
-  printf("USB Power Enabled\r\n");
+  DEBUG_PRINTF("USB Power Enabled\r\n");
  
 
   // Initialize USB Host
   MX_USB_Host_Init();
-  printf("\r\n=== STM32 USB MIDI Controller ===\r\n");
-  printf("Initializing...\r\n");
+  DEBUG_PRINTF("\r\n=== STM32 USB MIDI Controller ===\r\n");
+  DEBUG_PRINTF("Initializing...\r\n");
 
 
 
@@ -152,7 +162,7 @@ int main(void)
   /* Initialize SysEx messages */
   InitializeSysExMessages();
 
-  printf("System Ready - Waiting for USB MIDI device...\r\n");
+  DEBUG_PRINTF("System Ready - Waiting for USB MIDI device...\r\n");
   /* Infinite loop */
   while (1)
   {
@@ -161,11 +171,11 @@ int main(void)
     extern volatile uint8_t system_reset_requested;
     if (system_reset_requested)
     {
-      //printf("\r\n[MAIN] System reset requested due to USB errors\r\n");
-      //printf("[MAIN] This enables hot-plug connection recovery\r\n");
-      //printf("[MAIN] Resetting in 1 second...\r\n");
+      //DEBUG_PRINTF("\r\n[MAIN] System reset requested due to USB errors\r\n");
+      //DEBUG_PRINTF("[MAIN] This enables hot-plug connection recovery\r\n");
+      //DEBUG_PRINTF("[MAIN] Resetting in 1 second...\r\n");
       //HAL_Delay(1000);
-      //printf("[MAIN] RESET NOW\r\n");
+      //DEBUG_PRINTF("[MAIN] RESET NOW\r\n");
       //HAL_Delay(100);
       NVIC_SystemReset();
     }
@@ -176,12 +186,12 @@ int main(void)
       uint32_t elapsed = HAL_GetTick() - midi_connection_time;
       if (elapsed >= 1000) /* 1 second has passed */
       {
-        printf("[GP-5] Requesting initial preset number...\r\n");
+        DEBUG_PRINTF("[GP-5] Requesting initial preset number...\r\n");
         GP5_MIDI_RequestInitialPreset();
         preset_request_pending = 0; /* Clear flag */
         
         /* Request startup preset recall after initial GP-5 connection */
-        printf("[Main] Requesting startup preset recall...\r\n");
+        DEBUG_PRINTF("[Main] Requesting startup preset recall...\r\n");
         PresetButtons_RequestStartupPresetRecall();
       }
     }
@@ -280,6 +290,7 @@ void Error_Handler(void)
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+     ex: DEBUG_PRINTF("Wrong parameters value: file %s on line %d\r\n", file, line) */
 }
 #endif /* USE_FULL_ASSERT */
+

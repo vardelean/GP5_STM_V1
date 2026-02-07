@@ -12,6 +12,7 @@
 #include "gp5_midi.h"
 #include "display.h"
 #include "flash_storage.h"
+#include "debug.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -88,7 +89,7 @@ void PresetButtons_Init(void)
   /* Initialize Flash storage first */
   if (FlashStorage_Init() != 0)
   {
-    printf("[PresetButtons] ERROR: Failed to initialize Flash storage\r\n");
+    DEBUG_PRINTF("[PresetButtons] ERROR: Failed to initialize Flash storage\r\n");
     return;
   }
   
@@ -96,7 +97,7 @@ void PresetButtons_Init(void)
   uint8_t savedIndex = FlashStorage_GetCurrentPresetIndex();
   FlashStorage_ExtractBankButton(savedIndex, &currentBank, &currentButton);
   
-  printf("[PresetButtons] Loaded saved preset: Bank %d, Button %d (Index %d)\r\n", 
+  DEBUG_PRINTF("[PresetButtons] Loaded saved preset: Bank %d, Button %d (Index %d)\r\n", 
          currentBank + 1, currentButton + 1, savedIndex);
   
   temporaryBank = currentBank;
@@ -128,7 +129,7 @@ void PresetButtons_Init(void)
   /* Update display with saved preset info */
   UpdateDisplayForCurrentPreset();
   
-  printf("[PresetButtons] Initialized\r\n");
+  DEBUG_PRINTF("[PresetButtons] Initialized\r\n");
 }
 
 /**
@@ -146,14 +147,14 @@ void PresetButtons_RequestStartupPresetRecall(void)
   
   if (storedGP5Preset == 0xFF)
   {
-    printf("[PresetButtons] No preset stored for Bank %d Button %d, requesting current GP-5 preset\r\n",
+    DEBUG_PRINTF("[PresetButtons] No preset stored for Bank %d Button %d, requesting current GP-5 preset\r\n",
            currentBank + 1, currentButton + 1);
     GP5_MIDI_RequestPresetNumber();
     startupPresetRecallPending = false;
     return;
   }
   
-  printf("[PresetButtons] Recalling stored preset: GP-5 #%d\r\n", storedGP5Preset);
+  DEBUG_PRINTF("[PresetButtons] Recalling stored preset: GP-5 #%d\r\n", storedGP5Preset);
   SendPresetWithRetry(storedGP5Preset);
   startupPresetRecallPending = false;
 }
@@ -217,7 +218,7 @@ void PresetButtons_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
         buttonState = BTN_STATE_PRESSED;
         pressedButton = GPIO_Pin;
         buttonPressTime = HAL_GetTick();
-        printf("[BTN] CTL pressed - hold for 2s to toggle tuner\r\n");
+        DEBUG_PRINTF("[BTN] CTL pressed - hold for 2s to toggle tuner\r\n");
       }
       else if (GPIO_Pin == btnTapTempo_Pin)
       {
@@ -225,7 +226,7 @@ void PresetButtons_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
         buttonState = BTN_STATE_PRESSED;
         pressedButton = GPIO_Pin;
         buttonPressTime = HAL_GetTick();
-        printf("[BTN] Tap Tempo pressed - hold for save (2s) or clear (5s)\r\n");
+        DEBUG_PRINTF("[BTN] Tap Tempo pressed - hold for save (2s) or clear (5s)\r\n");
       }
     }
   }
@@ -260,7 +261,7 @@ void PresetButtons_Process(void)
       saveActionTriggered = true;
       
       /* Save current GP-5 preset to current STM32 location */
-      printf("[BTN] Tap Tempo SAVE (2s): Requesting current GP-5 preset...\r\n");
+      DEBUG_PRINTF("[BTN] Tap Tempo SAVE (2s): Requesting current GP-5 preset...\r\n");
       GP5_MIDI_RequestPresetNumber();
       /* Actual save happens in PresetButtons_SetCurrentPreset() */
     }
@@ -273,14 +274,14 @@ void PresetButtons_Process(void)
       /* Clear the current STM32 preset location */
       uint8_t presetIndex = CalculatePresetIndex(currentBank, currentButton);
       
-      printf("[BTN] Tap Tempo CLEAR (5s): Bank %d, Button %d\r\n", 
+      DEBUG_PRINTF("[BTN] Tap Tempo CLEAR (5s): Bank %d, Button %d\r\n", 
              currentBank + 1, currentButton + 1);
       
       if (FlashStorage_SavePreset(presetIndex, 0xFF) == 0)
       {
         /* Update display to show "--" */
         Display_GP5SavedPreset(0xFF);
-        printf("[BTN] Preset cleared successfully\r\n");
+        DEBUG_PRINTF("[BTN] Preset cleared successfully\r\n");
       }
     }
   }
@@ -300,7 +301,7 @@ void PresetButtons_Process(void)
       
       /* Send CC#58 (Tuner ON/OFF) to GP-5 */
       uint8_t value = tunerOn ? 0x7F : 0x00;  /* 127 for ON, 0 for OFF */
-      printf("[BTN] CTL (2s hold): Tuner %s (CC#58, value=%d)\r\n", tunerOn ? "ON" : "OFF", value);
+      DEBUG_PRINTF("[BTN] CTL (2s hold): Tuner %s (CC#58, value=%d)\r\n", tunerOn ? "ON" : "OFF", value);
       MIDI_Manager_SendCC(GP5_MIDI_CHANNEL, GP5_CC_TUNER, value);
     }
   }
@@ -326,18 +327,18 @@ void PresetButtons_Process(void)
           if (timeDiff >= TAP_TEMPO_MIN_MS && timeDiff <= TAP_TEMPO_MAX_MS)
           {
             tempoMs = timeDiff;
-            printf("[BTN] Tap Tempo: %lu ms\r\n", tempoMs);
+            DEBUG_PRINTF("[BTN] Tap Tempo: %lu ms\r\n", tempoMs);
             SendTapTempoSysEx(tempoMs);
           }
           else
           {
-            printf("[BTN] Tap Tempo: Out of range (%lu ms), valid range: %d-%d ms\r\n", 
+            DEBUG_PRINTF("[BTN] Tap Tempo: Out of range (%lu ms), valid range: %d-%d ms\r\n", 
                    timeDiff, TAP_TEMPO_MIN_MS, TAP_TEMPO_MAX_MS);
           }
         }
         else
         {
-          printf("[BTN] Tap Tempo: First tap registered\r\n");
+          DEBUG_PRINTF("[BTN] Tap Tempo: First tap registered\r\n");
         }
         
         lastTapTime = currentTime;
@@ -347,12 +348,12 @@ void PresetButtons_Process(void)
       /* But only if tuner is OFF - if tuner is ON, block CTL command */
       if (isCtlButton && !tunerActionTriggered && !tunerOn)
       {
-        printf("[BTN] CTL (quick press): Sending CC#69 (CTL screen)\r\n");
+        DEBUG_PRINTF("[BTN] CTL (quick press): Sending CC#69 (CTL screen)\r\n");
         MIDI_Manager_SendCC(GP5_MIDI_CHANNEL, GP5_CC_CTL_SCREEN, 0x7F);
       }
       else if (isCtlButton && !tunerActionTriggered && tunerOn)
       {
-        printf("[BTN] CTL blocked: Tuner is ON - hold 2s to turn tuner OFF\r\n");
+        DEBUG_PRINTF("[BTN] CTL blocked: Tuner is ON - hold 2s to turn tuner OFF\r\n");
       }
       
       /* Debounce complete, return to idle */
@@ -380,7 +381,7 @@ void PresetButtons_Process(void)
       
       if (storedGP5Preset != 0xFF && storedGP5Preset <= MAX_PRESET_NUMBER)
       {
-        printf("[PresetButtons] Retry %d/%d: Sending preset %d\r\n", 
+        DEBUG_PRINTF("[PresetButtons] Retry %d/%d: Sending preset %d\r\n", 
                presetRecallRetryCount, PRESET_RETRY_COUNT, storedGP5Preset);
         
         GP5_MIDI_NotifyPresetChangeSent();
@@ -391,7 +392,7 @@ void PresetButtons_Process(void)
         
         if (presetRecallRetryCount > PRESET_RETRY_COUNT)
         {
-          printf("[PresetButtons] Preset recall failed after %d retries\r\n", PRESET_RETRY_COUNT);
+          DEBUG_PRINTF("[PresetButtons] Preset recall failed after %d retries\r\n", PRESET_RETRY_COUNT);
           presetRecallRetryCount = 0;
         }
       }
@@ -430,14 +431,14 @@ void PresetButtons_SetCurrentPreset(uint8_t preset)
 {
   if (preset > MAX_PRESET_NUMBER)
   {
-    printf("[PresetButtons] Invalid GP-5 preset: %d\r\n", preset);
+    DEBUG_PRINTF("[PresetButtons] Invalid GP-5 preset: %d\r\n", preset);
     return;
   }
   
   currentGP5Preset = preset;
   currentPresetValid = true;
   
-  printf("[PresetButtons] GP-5 preset updated: %d\r\n", preset);
+  DEBUG_PRINTF("[PresetButtons] GP-5 preset updated: %d\r\n", preset);
   
   /* Check if this was triggered by a save action (Tap Tempo) */
   if (saveActionTriggered)
@@ -445,14 +446,14 @@ void PresetButtons_SetCurrentPreset(uint8_t preset)
     /* Save the current GP-5 preset to the current STM32 preset location */
     uint8_t presetIndex = CalculatePresetIndex(currentBank, currentButton);
     
-    printf("[BTN] SAVING GP-5 preset %d to STM32 Bank %d, Button %d\r\n",
+    DEBUG_PRINTF("[BTN] SAVING GP-5 preset %d to STM32 Bank %d, Button %d\r\n",
            preset, currentBank + 1, currentButton + 1);
     
     if (FlashStorage_SavePreset(presetIndex, preset) == 0)
     {
       /* Update display */
       Display_GP5SavedPreset(preset);
-      printf("[BTN] Preset saved successfully\r\n");
+      DEBUG_PRINTF("[BTN] Preset saved successfully\r\n");
     }
     
     /* Note: saveActionTriggered flag stays true until button is released */
@@ -462,7 +463,7 @@ void PresetButtons_SetCurrentPreset(uint8_t preset)
   /* Clear retry counter if preset received successfully */
   if (presetRecallRetryCount > 0)
   {
-    printf("[PresetButtons] Preset recall ACK received\r\n");
+    DEBUG_PRINTF("[PresetButtons] Preset recall ACK received\r\n");
     presetRecallRetryCount = 0;
   }
 }
@@ -486,7 +487,7 @@ void PresetButtons_OnPresetChangeACK(bool sentByUs)
   else
   {
     /* External preset change, request current preset */
-    printf("[PresetButtons] External change detected, requesting preset\r\n");
+    DEBUG_PRINTF("[PresetButtons] External change detected, requesting preset\r\n");
     GP5_MIDI_RequestPresetNumber();
   }
 }
@@ -529,7 +530,7 @@ static void UpdateDisplayForCurrentPreset(void)
   */
 static void SendPresetWithRetry(uint8_t gp5Preset)
 {
-  printf("[PresetButtons] Sending GP-5 preset: %d\r\n", gp5Preset);
+  DEBUG_PRINTF("[PresetButtons] Sending GP-5 preset: %d\r\n", gp5Preset);
   
   GP5_MIDI_NotifyPresetChangeSent();
   MIDI_Manager_SendCC(GP5_MIDI_CHANNEL, 0, gp5Preset);
@@ -572,7 +573,7 @@ static void HandlePresetButton(uint8_t buttonNum)
     extern SSD1306_COLOR bankNumColor;
     bankNumColor = InvertBankBackground(bankNumColor, currentBank + 1);
     isBankInverted = false;
-    printf("[BTN] Bank display normalized after preset selection\r\n");
+    DEBUG_PRINTF("[BTN] Bank display normalized after preset selection\r\n");
   }
   
   /* Save current preset index to Flash */
@@ -581,7 +582,7 @@ static void HandlePresetButton(uint8_t buttonNum)
   /* Only send CC if preset is valid (not 0xFF) */
   if (storedGP5Preset == 0xFF)
   {
-    printf("[BTN] Preset %d (Bank %d, Button %d) is empty, no CC sent\r\n",
+    DEBUG_PRINTF("[BTN] Preset %d (Bank %d, Button %d) is empty, no CC sent\r\n",
            presetIndex, bankToUse + 1, buttonNum + 1);
     return;
   }
@@ -589,7 +590,7 @@ static void HandlePresetButton(uint8_t buttonNum)
   /* Send CC if preset is different or bank changed */
   if (!currentPresetValid || storedGP5Preset != currentGP5Preset || isBankInverted)
   {
-    printf("[BTN] Preset %d: Sending GP-5 #%d\r\n", presetIndex, storedGP5Preset);
+    DEBUG_PRINTF("[BTN] Preset %d: Sending GP-5 #%d\r\n", presetIndex, storedGP5Preset);
     SendPresetWithRetry(storedGP5Preset);
     
     commandSentThisPress = true;
@@ -617,7 +618,7 @@ static void HandleBankUpButton(void)
   
   temporaryBank = newTempBank;
   
-  printf("[BTN] Bank %d (temp, current=%d)\r\n", temporaryBank + 1, currentBank + 1);
+  DEBUG_PRINTF("[BTN] Bank %d (temp, current=%d)\r\n", temporaryBank + 1, currentBank + 1);
   
   /* Update display */
   extern SSD1306_COLOR bankNumColor;
@@ -629,7 +630,7 @@ static void HandleBankUpButton(void)
     {
       bankNumColor = InvertBankBackground(bankNumColor, currentBank + 1);
       isBankInverted = false;
-      printf("[BTN] Bank display normalized\r\n");
+      DEBUG_PRINTF("[BTN] Bank display normalized\r\n");
     }
   }
   else
@@ -666,7 +667,7 @@ static void HandleBankDownButton(void)
   
   temporaryBank = newTempBank;
   
-  printf("[BTN] Bank %d (temp, current=%d)\r\n", temporaryBank + 1, currentBank + 1);
+  DEBUG_PRINTF("[BTN] Bank %d (temp, current=%d)\r\n", temporaryBank + 1, currentBank + 1);
   
   /* Update display */
   extern SSD1306_COLOR bankNumColor;
@@ -678,7 +679,7 @@ static void HandleBankDownButton(void)
     {
       bankNumColor = InvertBankBackground(bankNumColor, currentBank + 1);
       isBankInverted = false;
-      printf("[BTN] Bank display normalized\r\n");
+      DEBUG_PRINTF("[BTN] Bank display normalized\r\n");
     }
   }
   else
@@ -816,13 +817,15 @@ static void SendTapTempoSysEx(uint32_t tempoMs)
   
   sysexBuffer[sysexIdx++] = 0xF7;  /* SysEx end */
   
-  printf("[Tap Tempo] Tempo = %lu ms (%.1f BPM)\r\n", tempoMs, 60000.0f / (float)tempoMs);
-  printf("[SysEx] ");
+  DEBUG_PRINTF("[Tap Tempo] Tempo = %lu ms (%.1f BPM)\r\n", tempoMs, 60000.0f / (float)tempoMs);
+  DEBUG_PRINTF("[SysEx] ");
   for (uint32_t i = 0; i < sysexIdx; i++)
   {
-    printf("%02X ", sysexBuffer[i]);
+    DEBUG_PRINTF("%02X ", sysexBuffer[i]);
   }
-  printf("\r\n");
+  DEBUG_PRINTF("\r\n");
   
   MIDI_Manager_SendSysEx(sysexBuffer, sysexIdx);
 }
+
+

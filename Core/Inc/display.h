@@ -15,7 +15,7 @@ extern "C" {
 #define bankNumSecondDigitPosY 27
 #define presetNumPosX 86
 #define presetNumPosY 28
-#define gp5SavedPresetPosX 106
+#define gp5SavedPresetPosX 108
 #define gp5SavedPresetPosPosY 4
 
 /* External variables */

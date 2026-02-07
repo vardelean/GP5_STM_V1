@@ -10,6 +10,7 @@
 #include "flash_storage.h"
 #include "stm32g0xx_hal_flash.h"
 #include "stm32g0xx_hal_flash_ex.h"
+#include "debug.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -41,14 +42,14 @@ static int EraseFlashPage(uint32_t pageAddress);
   */
 int FlashStorage_Init(void)
 {
-  printf("[Flash] Initializing storage system...\r\n");
+  DEBUG_PRINTF("[Flash] Initializing storage system...\r\n");
   
   /* Check if Flash has been initialized before */
   bool alreadyInitialized = CheckInitializationFlag();
   
   if (!alreadyInitialized)
   {
-    printf("[Flash] First initialization detected\r\n");
+    DEBUG_PRINTF("[Flash] First initialization detected\r\n");
     
     /* Initialize preset array with empty values */
     memset(presetArray, PRESET_EMPTY, NUM_PRESETS);
@@ -57,47 +58,47 @@ int FlashStorage_Init(void)
     /* Write initial data to Flash */
     if (WritePresetsToFlash() != 0)
     {
-      printf("[Flash] ERROR: Failed to write initial presets\r\n");
+      DEBUG_PRINTF("[Flash] ERROR: Failed to write initial presets\r\n");
       return -1;
     }
     
     if (WriteCurrentPresetIndex(0) != 0)
     {
-      printf("[Flash] ERROR: Failed to write initial preset index\r\n");
+      DEBUG_PRINTF("[Flash] ERROR: Failed to write initial preset index\r\n");
       return -1;
     }
     
     /* Set initialization flag */
     if (SetInitializationFlag() != 0)
     {
-      printf("[Flash] ERROR: Failed to set initialization flag\r\n");
+      DEBUG_PRINTF("[Flash] ERROR: Failed to set initialization flag\r\n");
       return -1;
     }
     
-    printf("[Flash] Initial data written successfully\r\n");
+    DEBUG_PRINTF("[Flash] Initial data written successfully\r\n");
   }
   else
   {
-    printf("[Flash] Loading existing data from Flash...\r\n");
+    DEBUG_PRINTF("[Flash] Loading existing data from Flash...\r\n");
     
     /* Load existing data from Flash to RAM */
     if (ReadPresetsFromFlash() != 0)
     {
-      printf("[Flash] ERROR: Failed to read presets\r\n");
+      DEBUG_PRINTF("[Flash] ERROR: Failed to read presets\r\n");
       return -1;
     }
     
     if (ReadCurrentPresetIndex() != 0)
     {
-      printf("[Flash] ERROR: Failed to read current preset index\r\n");
+      DEBUG_PRINTF("[Flash] ERROR: Failed to read current preset index\r\n");
       return -1;
     }
     
-    printf("[Flash] Data loaded: Current index = %d\r\n", currentPresetIndex);
+    DEBUG_PRINTF("[Flash] Data loaded: Current index = %d\r\n", currentPresetIndex);
   }
   
   isInitialized = true;
-  printf("[Flash] Storage system ready\r\n");
+  DEBUG_PRINTF("[Flash] Storage system ready\r\n");
   return 0;
 }
 
@@ -133,14 +134,14 @@ int FlashStorage_SavePreset(uint8_t presetIndex, uint8_t gp5Preset)
 {
   if (presetIndex >= NUM_PRESETS)
   {
-    printf("[Flash] ERROR: Invalid preset index: %d\r\n", presetIndex);
+    DEBUG_PRINTF("[Flash] ERROR: Invalid preset index: %d\r\n", presetIndex);
     return -1;
   }
   
   /* Validate GP-5 preset number */
   if (gp5Preset != PRESET_EMPTY && gp5Preset > PRESET_VALID_MAX)
   {
-    printf("[Flash] ERROR: Invalid GP-5 preset: %d\r\n", gp5Preset);
+    DEBUG_PRINTF("[Flash] ERROR: Invalid GP-5 preset: %d\r\n", gp5Preset);
     return -1;
   }
   
@@ -150,11 +151,11 @@ int FlashStorage_SavePreset(uint8_t presetIndex, uint8_t gp5Preset)
   /* Write to Flash */
   if (WritePresetsToFlash() != 0)
   {
-    printf("[Flash] ERROR: Failed to write preset to Flash\r\n");
+    DEBUG_PRINTF("[Flash] ERROR: Failed to write preset to Flash\r\n");
     return -1;
   }
   
-  printf("[Flash] Saved: STM32[%d] = GP-5[%d]\r\n", presetIndex, gp5Preset);
+  DEBUG_PRINTF("[Flash] Saved: STM32[%d] = GP-5[%d]\r\n", presetIndex, gp5Preset);
   return 0;
 }
 
@@ -176,7 +177,7 @@ int FlashStorage_SaveCurrentPresetIndex(uint8_t presetIndex)
 {
   if (presetIndex >= NUM_PRESETS)
   {
-    printf("[Flash] ERROR: Invalid preset index: %d\r\n", presetIndex);
+    DEBUG_PRINTF("[Flash] ERROR: Invalid preset index: %d\r\n", presetIndex);
     return -1;
   }
   
@@ -184,7 +185,7 @@ int FlashStorage_SaveCurrentPresetIndex(uint8_t presetIndex)
   
   if (WriteCurrentPresetIndex(presetIndex) != 0)
   {
-    printf("[Flash] ERROR: Failed to write current preset index\r\n");
+    DEBUG_PRINTF("[Flash] ERROR: Failed to write current preset index\r\n");
     return -1;
   }
   
@@ -213,7 +214,7 @@ static int ReadPresetsFromFlash(void)
   /* Compare arrays for data integrity */
   if (memcmp(presetArray, arrayB, NUM_PRESETS) != 0)
   {
-    printf("[Flash] WARNING: Array A and B mismatch, using Array A\r\n");
+    DEBUG_PRINTF("[Flash] WARNING: Array A and B mismatch, using Array A\r\n");
   }
   
   return 0;
@@ -231,7 +232,7 @@ static int WritePresetsToFlash(void)
   status = HAL_FLASH_Unlock();
   if (status != HAL_OK)
   {
-    printf("[Flash] ERROR: Failed to unlock Flash\r\n");
+    DEBUG_PRINTF("[Flash] ERROR: Failed to unlock Flash\r\n");
     return -1;
   }
   
@@ -252,7 +253,7 @@ static int WritePresetsToFlash(void)
     status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, address, data);
     if (status != HAL_OK)
     {
-      printf("[Flash] ERROR: Failed to write array A at offset %lu\r\n", i);
+      DEBUG_PRINTF("[Flash] ERROR: Failed to write array A at offset %lu\r\n", i);
       HAL_FLASH_Lock();
       return -1;
     }
@@ -268,7 +269,7 @@ static int WritePresetsToFlash(void)
     status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, address, data);
     if (status != HAL_OK)
     {
-      printf("[Flash] ERROR: Failed to write array B at offset %lu\r\n", i);
+      DEBUG_PRINTF("[Flash] ERROR: Failed to write array B at offset %lu\r\n", i);
       HAL_FLASH_Lock();
       return -1;
     }
@@ -320,7 +321,7 @@ static int ReadCurrentPresetIndex(void)
     /* Validate range */
     if (currentPresetIndex >= NUM_PRESETS)
     {
-      printf("[Flash] WARNING: Invalid preset index %d, resetting to 0\r\n", currentPresetIndex);
+      DEBUG_PRINTF("[Flash] WARNING: Invalid preset index %d, resetting to 0\r\n", currentPresetIndex);
       currentPresetIndex = 0;
     }
   }
@@ -358,14 +359,14 @@ static int WriteCurrentPresetIndex(uint8_t index)
   status = HAL_FLASH_Unlock();
   if (status != HAL_OK)
   {
-    printf("[Flash] ERROR: Failed to unlock Flash for index write\r\n");
+    DEBUG_PRINTF("[Flash] ERROR: Failed to unlock Flash for index write\r\n");
     return -1;
   }
   
   /* If no slot available, erase page and start over */
   if (nextSlot < 0)
   {
-    printf("[Flash] Wear leveling: Erasing current preset page\r\n");
+    DEBUG_PRINTF("[Flash] Wear leveling: Erasing current preset page\r\n");
     if (EraseFlashPage(CURRENT_PRESET_ADDRESS) != 0)
     {
       HAL_FLASH_Lock();
@@ -383,7 +384,7 @@ static int WriteCurrentPresetIndex(uint8_t index)
   
   if (status != HAL_OK)
   {
-    printf("[Flash] ERROR: Failed to write current preset index\r\n");
+    DEBUG_PRINTF("[Flash] ERROR: Failed to write current preset index\r\n");
     HAL_FLASH_Lock();
     return -1;
   }
@@ -416,7 +417,7 @@ static int SetInitializationFlag(void)
   status = HAL_FLASH_Unlock();
   if (status != HAL_OK)
   {
-    printf("[Flash] ERROR: Failed to unlock Flash for init flag\r\n");
+    DEBUG_PRINTF("[Flash] ERROR: Failed to unlock Flash for init flag\r\n");
     return -1;
   }
   
@@ -433,7 +434,7 @@ static int SetInitializationFlag(void)
   
   if (status != HAL_OK)
   {
-    printf("[Flash] ERROR: Failed to write init flag\r\n");
+    DEBUG_PRINTF("[Flash] ERROR: Failed to write init flag\r\n");
     HAL_FLASH_Lock();
     return -1;
   }
@@ -472,7 +473,7 @@ static int EraseFlashPage(uint32_t pageAddress)
   
   if (timeout == 0)
   {
-    printf("[Flash] ERROR: Erase timeout on page %lu\r\n", pageNumber);
+    DEBUG_PRINTF("[Flash] ERROR: Erase timeout on page %lu\r\n", pageNumber);
     return -1;
   }
   
@@ -481,3 +482,5 @@ static int EraseFlashPage(uint32_t pageAddress)
   
   return 0;
 }
+
+
