@@ -23,7 +23,7 @@ void Display_Init(void)
 
   SSD1306_WriteString("BANK", Font_7x10, color);
   SSD1306_SetCursor(68,  4); 
-  SSD1306_WriteString("GP5: ", Font_7x10, color);
+  SSD1306_WriteString("GP-5: ", Font_7x10, color);
   SSD1306_SetCursor(gp5SavedPresetPosX,  gp5SavedPresetPosPosY); 
   SSD1306_WriteString("--", Font_7x10, color); // GP-5 saved preset placeholder
  

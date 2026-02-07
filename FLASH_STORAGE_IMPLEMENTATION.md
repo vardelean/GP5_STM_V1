@@ -160,7 +160,7 @@ SSD1306_COLOR InvertBankBackground(SSD1306_COLOR currentColor, uint8_t bankNumbe
 
 ```
 ┌─────────────────────────────┬─────────────────────────────┐
-│       BANK                  │  GP5: 56                    │
+│       BANK                  │  GP-5:  56                  │
 ├─────────────────────────────┼─────────────────────────────┤
 │                             │                             │
 │         12                  │          3                  │
@@ -171,7 +171,7 @@ SSD1306_COLOR InvertBankBackground(SSD1306_COLOR currentColor, uint8_t bankNumbe
 
 - Bank: 1-16 (inverted background when temporary bank selected)
 - Button: 1-5 (current preset button)
-- GP5: Stored GP-5 preset (00-99 or "--" if empty)
+- GP-5: Stored GP-5 preset (00-99 or "--" if empty)
 
 ## Important Notes
 

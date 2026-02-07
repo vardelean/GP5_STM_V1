@@ -28,7 +28,6 @@
 #include "midi_manager.h"
 #include "gp5_midi.h"
 #include "preset_buttons.h"
-#include "flash_test.h"
 #include <stdio.h>
 #include <string.h>
 /* Private typedef -----------------------------------------------------------*/
@@ -120,10 +119,6 @@ int main(void)
   MX_GPIO_Init();
 
   MX_USART2_UART_Init();
-  
-  /* RUN FLASH TEST - UNCOMMENT TO TEST FLASH */
-  // FlashTest_Run();  /* FLASH TEST PASSED! Disabled for production */
-  
   MX_I2C2_Init();
   
   // Initialize display

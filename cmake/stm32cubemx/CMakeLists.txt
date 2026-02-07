@@ -42,7 +42,6 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/gp5_midi.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/preset_buttons.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/flash_storage.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/flash_test.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Lib/SSD1306/ssd1306.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Lib/SSD1306/ssd1306_fonts.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../startup_stm32g0b1xx.s
