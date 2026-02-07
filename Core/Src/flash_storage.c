@@ -445,32 +445,39 @@ static int SetInitializationFlag(void)
 }
 
 /**
-  * @brief  Erase a Flash page
+  * @brief  Erase a Flash page using manual sequence (HAL has issues with this chip)
   * @param  pageAddress: Start address of the page
   * @retval 0 on success, -1 on error
   */
 static int EraseFlashPage(uint32_t pageAddress)
 {
-  HAL_StatusTypeDef status;
-  FLASH_EraseInitTypeDef eraseInit;
-  uint32_t pageError = 0;
-  
   /* Calculate page number */
   uint32_t pageNumber = (pageAddress - FLASH_START_ADDRESS) / FLASH_PAGE_SIZE;
   
-  /* Configure erase */
-  eraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
-  eraseInit.Page = pageNumber;
-  eraseInit.NbPages = 1;
+  /* Manual erase sequence - HAL preserves unknown CR bits which breaks erase */
   
-  /* Perform erase */
-  status = HAL_FLASHEx_Erase(&eraseInit, &pageError);
+  /* Set up erase: PER bit + page number */
+  FLASH->CR = FLASH_CR_PER | (pageNumber << FLASH_CR_PNB_Pos);
   
-  if (status != HAL_OK)
+  /* Start erase */
+  FLASH->CR |= FLASH_CR_STRT;
+  
+  /* Wait for BSY flag with timeout */
+  uint32_t timeout = 1000;
+  while ((FLASH->SR & FLASH_SR_BSY1) && timeout > 0)
   {
-    printf("[Flash] ERROR: Failed to erase page %lu (error: 0x%lx)\r\n", pageNumber, pageError);
+    HAL_Delay(1);
+    timeout--;
+  }
+  
+  if (timeout == 0)
+  {
+    printf("[Flash] ERROR: Erase timeout on page %lu\r\n", pageNumber);
     return -1;
   }
+  
+  /* Clear PER bit */
+  CLEAR_BIT(FLASH->CR, FLASH_CR_PER);
   
   return 0;
 }
