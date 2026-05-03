@@ -77,11 +77,11 @@ All core features implemented, tested, and optimized for live performance use on
 - **5 Preset buttons** with **16 banks** (bank up/down navigation):
   - **Preset Buttons 1-5**: Quick preset recall/save (80 total slots)
   - **Bank Up/Down**: Navigate between banks 1-16
-  - **CTL**: Send CC#69 to GP-5 (tuner toggle)
+  - **CTL**: Send CC#69 to GP-5 (toggle)
   - **Tap Tempo**: Preset save (2-5s hold) / clear (>5s hold)
 
 - **Button Features**:
-  - Interrupt-driven with 50ms debounce
+  - Interrupt-driven. Fast response on push, 50ms debounce on relesase
   - One button active at a time (mutual exclusion)
   - **Short press** (< 2s): Recall saved preset
   - **Tap Tempo + Button** (2-5s): Save current GP-5 preset
